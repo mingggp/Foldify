@@ -1,4 +1,4 @@
-import { Cuboid, PaintBucket, Download, Settings, X, SlidersHorizontal, ImagePlus, Trash2, FlipHorizontal, FlipVertical, RotateCcw, RotateCw, Moon, Sun, Grid3x3, LightbulbOff, Lightbulb, Square, Circle, Star, Trash, Wand2, Loader2, AlertCircle, Save, LogOut, LogIn, Image as ImageIcon } from "lucide-react";
+import { Cuboid, PaintBucket, Download, Settings, X, SlidersHorizontal, ImagePlus, Trash2, FlipHorizontal, FlipVertical, RotateCcw, RotateCw, Moon, Sun, Grid3x3, LightbulbOff, Lightbulb, Square, Circle, Star, Trash, Wand2, Loader2, AlertCircle, Save, LogOut, LogIn, Image as ImageIcon, ChevronDown, ChevronRight } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import NetSelector from "../NetSelector";
 import { useAuth } from "../../contexts/AuthContext";
@@ -14,6 +14,7 @@ export default function Sidebar({ closeSidebar, facesConfig, setFacesConfig, und
   const [aiError, setAiError] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [clipboardFaceConfig, setClipboardFaceConfig] = useState(null);
+  const [isSetupOpen, setIsSetupOpen] = useState(false);
   
   const { currentUser, logout } = useAuth();
   const { t } = useLang();
@@ -171,7 +172,7 @@ export default function Sidebar({ closeSidebar, facesConfig, setFacesConfig, und
       }
 
       const response = await fetch(
-        "/api/hf/models/stabilityai/stable-diffusion-xl-base-1.0",
+        "/api/hf/models/black-forest-labs/FLUX.1-schnell",
         {
           headers: {
             Authorization: `Bearer ${apiKey}`,
@@ -276,13 +277,14 @@ export default function Sidebar({ closeSidebar, facesConfig, setFacesConfig, und
       <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-hide">
         
         {/* Prominent Smart Scan Button */}
-        <div className="relative group cursor-pointer" onClick={() => smartScanInputRef.current?.click()}>
-           <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl blur opacity-30 group-hover:opacity-70 transition duration-300"></div>
-           <div className="relative bg-white dark:bg-slate-800 border border-indigo-100 dark:border-indigo-900/50 p-4 rounded-xl shadow-sm flex flex-col items-center justify-center gap-2 transition-transform group-hover:scale-[1.02]">
-             <span className="text-3xl">🤖</span>
-             <div className="text-center">
-               <h4 className="font-bold text-slate-800 dark:text-slate-100 text-sm">Smart Scan Net</h4>
-               <p className="text-[10px] text-slate-500 mt-1">อัปโหลดรูปคลี่ AI จะสร้าง 3D Box ให้ทันที!</p>
+        <div className="relative group cursor-pointer overflow-hidden rounded-xl" onClick={() => smartScanInputRef.current?.click()}>
+           <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-xl blur opacity-70 dark:opacity-50 group-hover:opacity-100 transition duration-300 animate-gradient-xy"></div>
+           <div className="relative bg-white dark:bg-slate-800 border border-indigo-100 dark:border-indigo-900/50 p-4 rounded-xl shadow-sm flex flex-col items-center justify-center gap-2 transition-transform group-hover:scale-[1.02] overflow-hidden">
+             <div className="shimmer-effect"></div>
+             <span className="text-3xl relative z-10 animate-bounce" style={{ animationDuration: '3s' }}>🤖</span>
+             <div className="text-center relative z-10">
+               <h4 className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 text-sm">Smart Scan Net</h4>
+               <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">อัปโหลดรูปคลี่ AI จะสร้าง 3D Box ให้ทันที!</p>
              </div>
            </div>
            <input 
@@ -326,10 +328,19 @@ export default function Sidebar({ closeSidebar, facesConfig, setFacesConfig, und
         </div>
 
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-1">
-              {t('face')} Setup
-              <div className="flex gap-0.5 ml-1">
+          <div className="flex items-center justify-between bg-white dark:bg-slate-800 p-2 rounded-lg border border-slate-100 dark:border-slate-700 shadow-sm">
+            <div 
+              className="flex items-center gap-1 cursor-pointer flex-1 group" 
+              onClick={() => setIsSetupOpen(!isSetupOpen)}
+            >
+              <div className="text-slate-400 group-hover:text-indigo-500 transition-colors">
+                {isSetupOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+              </div>
+              <h3 className="text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                {t('face')} Setup
+              </h3>
+              
+              <div className="flex gap-0.5 ml-2" onClick={(e) => e.stopPropagation()}>
                 <button 
                   onClick={undoFaces} disabled={!canUndo}
                   className={`p-1 rounded ${canUndo ? 'text-indigo-600 hover:bg-slate-200 dark:text-indigo-400 dark:hover:bg-slate-700 cursor-pointer' : 'text-slate-300 dark:text-slate-600 cursor-not-allowed'}`}
@@ -345,11 +356,11 @@ export default function Sidebar({ closeSidebar, facesConfig, setFacesConfig, und
                   <RotateCw size={12} />
                 </button>
               </div>
-            </h3>
+            </div>
             <div className="flex gap-2">
               <button 
                 onClick={handleSetAllWhite}
-                className="text-[10px] px-1.5 py-1 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 rounded font-bold shadow-sm hover:bg-slate-50 transition-colors"
+                className="text-[10px] px-1.5 py-1 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 rounded font-bold shadow-sm hover:bg-slate-200 transition-colors"
                 title="Set All Clear"
               >
                 ⚪
@@ -363,9 +374,10 @@ export default function Sidebar({ closeSidebar, facesConfig, setFacesConfig, und
             </div>
           </div>
           
-          <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl space-y-4 shadow-sm">
-            
-            {/* Active Face Indication */}
+          {isSetupOpen && (
+            <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl space-y-4 shadow-sm animate-in slide-in-from-top-2 fade-in duration-200">
+              
+              {/* Active Face Indication */}
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Editing Face:</span>
@@ -608,7 +620,8 @@ export default function Sidebar({ closeSidebar, facesConfig, setFacesConfig, und
               </button>
             </div>
 
-          </div>
+            </div>
+          )}
         </div>
       </div>
 

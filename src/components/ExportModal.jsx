@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Download, X, ZoomIn, ZoomOut, RotateCw, RotateCcw, Move, Crop } from 'lucide-react';
+import { Download, X, ZoomIn, ZoomOut, RotateCw, RotateCcw, Move, Crop, Copy } from 'lucide-react';
+import { useToast } from '../contexts/ToastContext';
 
 export default function ExportModal({ exportImageBlob, onClose }) {
+  const toast = useToast();
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -13,6 +15,15 @@ export default function ExportModal({ exportImageBlob, onClose }) {
   const containerRef = useRef(null);
   
   const src = exportImageBlob;
+  const [originalRatio, setOriginalRatio] = useState(1);
+
+  useEffect(() => {
+    const img = new Image();
+    img.src = src;
+    img.onload = () => {
+      setOriginalRatio(img.width / img.height);
+    };
+  }, [src]);
 
   const handleMouseDown = (e) => {
     setIsDragging(true);
@@ -38,65 +49,81 @@ export default function ExportModal({ exportImageBlob, onClose }) {
     '4:3': 4 / 3,
   };
 
-  const handleDownload = () => {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
+  const generateExportCanvas = () => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      const img = new Image();
+      img.src = src;
+      img.onload = () => {
+        let exportW = img.width;
+        let exportH = img.height;
+
+        const cropBox = document.getElementById('crop-box');
+        if (aspectRatio !== 'original' && cropBox) {
+          const cropRect = cropBox.getBoundingClientRect();
+          exportW = cropRect.width;
+          exportH = cropRect.height;
+        }
+
+        canvas.width = exportW;
+        canvas.height = exportH;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.translate(pan.x, pan.y);
+        ctx.scale(zoom, zoom);
+        ctx.rotate(rotation * (Math.PI / 180));
+        
+        ctx.drawImage(img, -img.width / 2, -img.height / 2);
+        resolve(canvas);
+      };
+    });
+  };
+
+  const handleDownload = async () => {
+    const canvas = await generateExportCanvas();
+    const finalImage = canvas.toDataURL("image/png");
+    const link = document.createElement("a");
+    link.href = finalImage;
+    link.download = `3d-box-${aspectRatio.replace(':', 'x')}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
     
-    const img = new Image();
-    img.src = src;
-    img.onload = () => {
-      let exportW = img.width;
-      let exportH = img.height;
-      let sx = 0;
-      let sy = 0;
-      let sWidth = img.width;
-      let sHeight = img.height;
+    onClose();
+  };
 
-      // Use the visual crop box DOM size to exactly match what the user framed
-      const cropBox = document.getElementById('crop-box');
-      if (aspectRatio !== 'original' && cropBox) {
-        const cropRect = cropBox.getBoundingClientRect();
-        exportW = cropRect.width;
-        exportH = cropRect.height;
-      }
-
-      canvas.width = exportW;
-      canvas.height = exportH;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      // Move origin to center of Crop frame
-      ctx.translate(canvas.width / 2, canvas.height / 2);
-      
-      // Apply UI Transforms (Pan, Zoom, Rotation)
-      ctx.translate(pan.x, pan.y);
-      ctx.scale(zoom, zoom);
-      ctx.rotate(rotation * (Math.PI / 180));
-      
-      // Draw image from the offset exact crop coordinates onto the temporary canvas 
-      // Note: Actually, because panning/zooming applies to the *entire* image visually inside the Crop Box,
-      // it is much easier to just draw the WHOLE image but offset its center!
-      // The Canvas size (exportW x exportH) ALREADY acts as our bounding box mask natively!
-      ctx.drawImage(img, -img.width / 2, -img.height / 2);
-      
-      // We fill transparent regions with pure white (or keep transparent if they want, but usually JPEG or simple PNG looks better without weird alpha, we'll keep it default transparent)
-      
-      const finalImage = canvas.toDataURL("image/png");
-      const link = document.createElement("a");
-      link.href = finalImage;
-      link.download = `3d-box-${aspectRatio.replace(':', 'x')}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      onClose();
-    };
+  const handleCopy = async () => {
+    try {
+      const canvas = await generateExportCanvas();
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          toast('เกิดข้อผิดพลาดในการสร้างรูปภาพ', 'error');
+          return;
+        }
+        
+        // Use the Clipboard API
+        try {
+          const item = new ClipboardItem({ 'image/png': blob });
+          await navigator.clipboard.write([item]);
+          toast('📋 คัดลอกรูปลงคลิปบอร์ดแล้ว!', 'success');
+          onClose();
+        } catch (err) {
+          console.error('Clipboard write error:', err);
+          toast('เบราว์เซอร์ไม่รองรับ หรือยังไม่ได้อนุญาตให้เข้าถึงคลิปบอร์ด', 'error');
+        }
+      }, 'image/png');
+    } catch (err) {
+      console.error(err);
+      toast('เกิดข้อผิดพลาดในการคัดลอก', 'error');
+    }
   };
 
   // Compute CSS style for the crop overlay box
   const getCropOverlayStyle = () => {
-    if (aspectRatio === 'original') return { display: 'none' };
-    
-    const targetRatio = Ratios[aspectRatio];
+    const targetRatio = aspectRatio === 'original' ? originalRatio : Ratios[aspectRatio];
     // We try to maximize the crop box within the preview area visually!
     return {
       aspectRatio: targetRatio,
@@ -151,16 +178,15 @@ export default function ExportModal({ exportImageBlob, onClose }) {
           </div>
 
           {/* CROP BOX OVERLAY */}
-          {aspectRatio !== 'original' && (
-             <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                <div className="absolute inset-0 bg-black/60 z-0"></div>
-                <div 
-                  id="crop-box"
-                  className="relative z-10 border-4 border-indigo-500 shadow-[0_0_0_9999px_rgba(0,0,0,0.7)] overflow-hidden flex items-center justify-center ring-2 ring-white/50"
-                  style={getCropOverlayStyle()}
-                >
-                   {/* We replicate the image inside the crop box to show it fully opaque! */}
-                   <img 
+          <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/60 z-0"></div>
+            <div 
+              id="crop-box"
+              className="relative z-10 border-4 border-indigo-500 shadow-[0_0_0_9999px_rgba(0,0,0,0.7)] overflow-hidden flex items-center justify-center ring-2 ring-white/50"
+              style={getCropOverlayStyle()}
+            >
+               {/* We replicate the image inside the crop box to show it fully opaque! */}
+               <img 
                     src={src} 
                     alt="Focus" 
                     draggable={false}
@@ -184,8 +210,7 @@ export default function ExportModal({ exportImageBlob, onClose }) {
                   </div>
                 </div>
              </div>
-          )}
-        </div>
+          </div>
 
         {/* Toolbar Footer */}
         <div className="p-5 border-t border-slate-800 bg-slate-900 flex flex-wrap items-center justify-between gap-6">
@@ -232,13 +257,22 @@ export default function ExportModal({ exportImageBlob, onClose }) {
             </div>
           </div>
 
-          <button 
-            onClick={handleDownload}
-            className="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg shadow-lg hover:shadow-indigo-500/25 transition-all"
-          >
-            <Download size={18} />
-            Export Image
-          </button>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={handleCopy}
+              className="flex items-center gap-2 px-5 py-3 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-lg shadow transition-colors"
+            >
+              <Copy size={18} />
+              คัดลอกรูป
+            </button>
+            <button 
+              onClick={handleDownload}
+              className="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg shadow-lg hover:shadow-indigo-500/25 transition-all"
+            >
+              <Download size={18} />
+              บันทึกรูป
+            </button>
+          </div>
         </div>
         
       </div>
