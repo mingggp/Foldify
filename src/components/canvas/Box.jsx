@@ -129,8 +129,8 @@ function FaceNode({ node, angle, facesConfig, getBinds, showShadows, showLabels,
     switch (logicalEdge) {
       case 'bottom': return { hingePos: [0, -1, 0], meshPos: [0, -1, 0], rot: [-angle, 0, 0] };
       case 'top':    return { hingePos: [0, 1, 0],  meshPos: [0, 1, 0],  rot: [angle, 0, 0] };
-      case 'left':   return { hingePos: [-1, 0, 0], meshPos: [-1, 0, 0], rot: [0, angle, 0] };
-      case 'right':  return { hingePos: [1, 0, 0],  meshPos: [1, 0, 0],  rot: [0, -angle, 0] };
+      case 'left':   return { hingePos: [1, 0, 0],  meshPos: [1, 0, 0],  rot: [0, -angle, 0] };
+      case 'right':  return { hingePos: [-1, 0, 0], meshPos: [-1, 0, 0], rot: [0, angle, 0] };
       default:       return { hingePos: [0, 0, 0],  meshPos: [0, 0, 0],  rot: [0, 0, 0] }; // Root handles itself
     }
   };
@@ -163,11 +163,12 @@ function FaceNode({ node, angle, facesConfig, getBinds, showShadows, showLabels,
         {/* Render Label floating slightly above face if enabled */}
         {showLabels && (
           <Text 
-            position={[0, 0, 0.05]} 
+            position={[0, 0, -0.05]} 
+            rotation={[0, Math.PI, 0]}
             fontSize={0.4} 
-            color={themeColor => showShadows ? "#000" : "#000"} 
-            outlineWidth={0.02} 
-            outlineColor="#ffffff"
+            color="#ffffff" 
+            outlineWidth={0.03} 
+            outlineColor="#000000"
             anchorX="center" 
             anchorY="middle"
           >
