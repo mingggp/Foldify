@@ -1,6 +1,6 @@
-# 📦 CEE 3D Box Builder
+# 📦 Foldify
 
-An interactive web-based 3D geometry and box builder application designed for the "Computer Engineering Essential Final Project". This application allows users to fold 2D nets into 3D boxes, apply custom textures (including AI-generated textures), utilize Computer Vision to scan nets, and save their creations.
+An interactive web-based 3D box builder application designed for the "Computer Engineering Essential Final Project". Foldify allows users to fold 2D nets into 3D boxes, apply custom textures (including AI-generated textures), utilize Computer Vision to scan nets from photos, and save their creations.
 
 ## ✨ Features (Mapped to Project Criteria)
 
@@ -37,7 +37,7 @@ An interactive web-based 3D geometry and box builder application designed for th
 1. **Clone the repository:**
    ```bash
    git clone <your-repo-url>
-   cd box-edu-3d
+   cd Foldify
    ```
 
 2. **Install dependencies:**
