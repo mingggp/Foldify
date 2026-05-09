@@ -76,14 +76,18 @@ export default function CustomCameraControls({
     };
 
     // ─── Orbit (no roll) ─────────────────────────────────────────────────────
-    const applyOrbit = (dx, dy, speed) => {
-      const spd = speed ?? orbitSpeed;
+    const applyOrbit = (dx, dy, speedFactor) => {
+      // Normalize by canvas dimensions to ensure consistent feel across phones, tablets, and desktop
+      const normDx = dx / canvas.clientWidth;
+      const normDy = dy / canvas.clientHeight;
+      
+      const spd = speedFactor ?? (Math.PI * 1.5); // Default: 1.5 PI radians per full screen swipe
       // Orbit axes relative to camera's current orientation ensures stable controls even when rolled
       const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
       const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
       
-      const yaw = new THREE.Quaternion().setFromAxisAngle(up, -dx * spd);
-      const pitch = new THREE.Quaternion().setFromAxisAngle(right, -dy * spd);
+      const yaw = new THREE.Quaternion().setFromAxisAngle(up, -normDx * spd);
+      const pitch = new THREE.Quaternion().setFromAxisAngle(right, -normDy * spd);
       
       s.dir.applyQuaternion(pitch).applyQuaternion(yaw).normalize();
       s.up.applyQuaternion(pitch).applyQuaternion(yaw).normalize();
@@ -151,7 +155,7 @@ export default function CustomCameraControls({
           const prevMy = (prevTouches[0].clientY + prevTouches[1].clientY) / 2;
           const currMx = (curr[0].clientX + curr[1].clientX) / 2;
           const currMy = (curr[0].clientY + curr[1].clientY) / 2;
-          applyOrbit(currMx - prevMx, currMy - prevMy, pinchOrbitSpeed);
+          applyOrbit(currMx - prevMx, currMy - prevMy, Math.PI * 2.0); // Slightly faster orbit when pinching
         }
 
         prevPinchDist = pinch;

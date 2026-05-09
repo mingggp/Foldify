@@ -1,11 +1,25 @@
 import { collection, addDoc, getDocs, query, where, deleteDoc, doc, Timestamp } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, storage } from "../config/firebase";
+import { db } from "../config/firebase";
 
-// Helper to convert blob URL to actual Blob object
-const fetchBlobFromUrl = async (blobUrl) => {
-  const response = await fetch(blobUrl);
-  return await response.blob();
+// Helper: compress any image URL (blob: or data:) into a small JPEG data URL
+// that fits safely within Firestore's 1MB document limit
+const compressTextureUrl = (url) => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      // Shrink to 128x128 for thumbnail storage (~5-10KB per face as JPEG)
+      canvas.width = 128;
+      canvas.height = 128;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, 128, 128);
+      // JPEG at 50% quality — small enough that 6 faces fit easily under 1MB
+      resolve(canvas.toDataURL("image/jpeg", 0.5));
+    };
+    img.onerror = () => resolve(null); // If image fails to load, just skip it
+    img.src = url;
+  });
 };
 
 export const saveBoxConfig = async (userId, payload) => {
@@ -15,24 +29,13 @@ export const saveBoxConfig = async (userId, payload) => {
     // Create a copy of config so we don't mutate the UI state unpredictably
     const configToSave = JSON.parse(JSON.stringify(facesConfig));
 
-    // Process all 6 faces for textures that need uploading
+    // Process all 6 faces: compress any local textures to small data URLs
     const faceKeys = Object.keys(configToSave);
     for (const key of faceKeys) {
       const face = configToSave[key];
-      if (face.textureUrl && face.textureUrl.startsWith('blob:')) {
-        // Fetch the blob
-        const blob = await fetchBlobFromUrl(face.textureUrl);
-        // Create unique path: users/{uid}/{timestamp}_{faceKey}.png
-        const storageRef = ref(storage, `users/${userId}/${Date.now()}_${key}.png`);
-        
-        // Upload to Storage
-        await uploadBytes(storageRef, blob, { contentType: 'image/png' });
-        
-        // Retrieve public download URL
-        const downloadUrl = await getDownloadURL(storageRef);
-        
-        // Replace blob URL with Firebase Storage URL
-        face.textureUrl = downloadUrl;
+      if (face.textureUrl && (face.textureUrl.startsWith('blob:') || face.textureUrl.startsWith('data:'))) {
+        // Compress to a small JPEG thumbnail for Firestore storage
+        face.textureUrl = await compressTextureUrl(face.textureUrl);
       }
     }
 
@@ -66,7 +69,11 @@ export const getUserBoxes = async (userId) => {
       boxes.push({ id: doc.id, ...doc.data() });
     });
     // Sort client-side to prevent Firebase Index requirement errors
-    return boxes.sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis());
+    return boxes.sort((a, b) => {
+      const aTime = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+      const bTime = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+      return bTime - aTime;
+    });
   } catch (error) {
     console.error("Error retrieving boxes:", error);
     throw error;
@@ -76,8 +83,6 @@ export const getUserBoxes = async (userId) => {
 export const deleteBox = async (boxId) => {
   try {
     await deleteDoc(doc(db, "boxes", boxId));
-    // Note: We are not aggressively deleting Storage images for simplicity,
-    // though in a production app we'd probably want to parse configToSave and delete them.
   } catch (error) {
     console.error("Error deleting box:", error);
     throw error;

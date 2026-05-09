@@ -32,7 +32,7 @@ function generateNetSignatures() {
 
     // Generate 8 transformations (4 rotations x 2 flips)
     const transforms = [];
-    
+
     // We'll keep it simple: generate flipX, flipY, and transposed (swap x/y).
     // This covers all 8 combinations.
     for (let flipX of [false, true]) {
@@ -43,7 +43,7 @@ function generateNetSignatures() {
             let py = flipY ? (height - 1 - p.y) : p.y;
             return swapXY ? { id: p.id, x: py, y: px } : { id: p.id, x: px, y: py };
           });
-          
+
           const tW = swapXY ? height : width;
           const tH = swapXY ? width : height;
 
@@ -78,86 +78,177 @@ export async function analyzeNetImage(file) {
     const img = new Image();
     img.crossOrigin = "Anonymous";
     img.onload = () => {
+      const MAX_DIM = 800;
+      let scale = 1;
+      if (img.width > MAX_DIM || img.height > MAX_DIM) {
+        scale = MAX_DIM / Math.max(img.width, img.height);
+      }
+
       const canvas = document.createElement("canvas");
-      canvas.width = img.width;
-      canvas.height = img.height;
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
-      ctx.drawImage(img, 0, 0);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
 
-      // 1. Establish Background Color from corners
-      const corners = [
-        0, (canvas.width - 1) * 4, 
-        (canvas.height - 1) * canvas.width * 4, 
-        ((canvas.height - 1) * canvas.width + canvas.width - 1) * 4
-      ];
-      let bgR = 0, bgG = 0, bgB = 0;
-      corners.forEach(idx => {
-        bgR += data[idx]; bgG += data[idx+1]; bgB += data[idx+2];
-      });
-      bgR /= 4; bgG /= 4; bgB /= 4;
-
-      const tolerance = 40; // color distance threshold
-      const mask = new Int8Array(canvas.width * canvas.height); // 0=bg, 1=line, -1=outside
-
-      // 2. Classify foreground (lines) vs background
+      // 1. Convert to Grayscale & Calculate Average Brightness
+      const gray = new Uint8Array(canvas.width * canvas.height);
+      let totalLuma = 0;
       for (let i = 0; i < canvas.width * canvas.height; i++) {
         const idx = i * 4;
-        const r = data[idx], g = data[idx+1], b = data[idx+2], a = data[idx+3];
-        const dist = Math.abs(r - bgR) + Math.abs(g - bgG) + Math.abs(b - bgB);
-        if (a > 50 && dist > tolerance) {
+        // Luminance formula
+        const luma = data[idx] * 0.299 + data[idx + 1] * 0.587 + data[idx + 2] * 0.114;
+        gray[i] = luma;
+        totalLuma += luma;
+      }
+      const avgLuma = totalLuma / (canvas.width * canvas.height);
+
+      const mask = new Int8Array(canvas.width * canvas.height); // 0=bg, 1=line, -1=outside
+      const w = canvas.width;
+      const h = canvas.height;
+
+      // 2. Thresholding: pixels significantly darker than average are lines.
+      // In a photo of paper, paper is bright, lines are dark.
+      const threshold = avgLuma * 0.8; // anything darker than 80% of average is a line
+      for (let i = 0; i < canvas.width * canvas.height; i++) {
+        if (data[i * 4 + 3] > 50 && gray[i] < threshold) {
           mask[i] = 1; // foreground / line
         }
       }
 
-      // 3. Flood fill from borders to mark OUTSIDE (-1)
+      // 3. Heavy Dilation to merge all dashed lines and shapes into one giant blob
+      const dilateRadius = Math.max(2, Math.floor(Math.min(w, h) * 0.02)); // ~16px for 800px image
+      const dilated = new Int8Array(w * h);
+
+      // Fast approximate dilation: block max filter
+      // Pass 1: Horizontal
+      const temp = new Int8Array(w * h);
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          let maxVal = 0;
+          for (let dx = -dilateRadius; dx <= dilateRadius; dx++) {
+            const nx = x + dx;
+            if (nx >= 0 && nx < w && mask[y * w + nx] === 1) {
+              maxVal = 1;
+              break;
+            }
+          }
+          temp[y * w + x] = maxVal;
+        }
+      }
+      // Pass 2: Vertical
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          let maxVal = 0;
+          for (let dy = -dilateRadius; dy <= dilateRadius; dy++) {
+            const ny = y + dy;
+            if (ny >= 0 && ny < h && temp[ny * w + x] === 1) {
+              maxVal = 1;
+              break;
+            }
+          }
+          dilated[y * w + x] = maxVal;
+        }
+      }
+
+      // 4. Find Connected Components on Dilated Mask
+      const labels = new Int32Array(w * h);
+      const sizes = [];
+      const bboxes = [];
+      let currentLabel = 1;
       const q = [];
-      const addQueue = (x, y) => {
-        if (x >= 0 && x < canvas.width && y >= 0 && y < canvas.height) {
-          const i = y * canvas.width + x;
-          if (mask[i] === 0) {
-            mask[i] = -1;
+
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const i = y * w + x;
+          if (dilated[i] === 1 && labels[i] === 0) {
+            let size = 0;
+            let cMinX = x, cMinY = y, cMaxX = x, cMaxY = y;
             q.push(x, y);
+            labels[i] = currentLabel;
+            let qIter = 0;
+
+            while (qIter < q.length) {
+              const cx = q[qIter++];
+              const cy = q[qIter++];
+              size++;
+
+              if (cx < cMinX) cMinX = cx;
+              if (cx > cMaxX) cMaxX = cx;
+              if (cy < cMinY) cMinY = cy;
+              if (cy > cMaxY) cMaxY = cy;
+
+              // 4-way connectivity is enough for dilated blobs
+              const neighbors = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+              for (const [dx, dy] of neighbors) {
+                const nx = cx + dx, ny = cy + dy;
+                if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+                  const ni = ny * w + nx;
+                  if (dilated[ni] === 1 && labels[ni] === 0) {
+                    labels[ni] = currentLabel;
+                    q.push(nx, ny);
+                  }
+                }
+              }
+            }
+            sizes[currentLabel] = size;
+            bboxes[currentLabel] = { minX: cMinX, minY: cMinY, maxX: cMaxX, maxY: cMaxY };
+            currentLabel++;
+            q.length = 0;
           }
         }
-      };
-
-      // Add all border pixels
-      for (let x = 0; x < canvas.width; x++) { addQueue(x, 0); addQueue(x, canvas.height - 1); }
-      for (let y = 0; y < canvas.height; y++) { addQueue(0, y); addQueue(canvas.width - 1, y); }
-
-      let qIter = 0;
-      while (qIter < q.length) {
-        const x = q[qIter++];
-        const y = q[qIter++];
-        addQueue(x+1, y); addQueue(x-1, y);
-        addQueue(x, y+1); addQueue(x, y-1);
       }
 
-      // 4. Find Bounding Box of INSIDE (mask !== -1)
-      let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
-      for (let y = 0; y < canvas.height; y++) {
-        for (let x = 0; x < canvas.width; x++) {
-          const i = y * canvas.width + x;
-          if (mask[i] !== -1) {
-            if (x < minX) minX = x;
-            if (x > maxX) maxX = x;
-            if (y < minY) minY = y;
-            if (y > maxY) maxY = y;
-          }
+      // Find the LARGEST blob (this will be the cube net)
+      let maxLabel = 0;
+      let maxSize = 0;
+      for (let i = 1; i < currentLabel; i++) {
+        if (sizes[i] > maxSize) {
+          maxSize = sizes[i];
+          maxLabel = i;
         }
       }
 
-      if (minX > maxX || minY > maxY) {
+      if (maxLabel === 0) {
         return reject(new Error("ไม่พบรูปทรงในภาพ (No shape detected)."));
       }
+
+      // The bounding box of the largest blob, shrunk by dilateRadius
+      let minX = Math.max(0, bboxes[maxLabel].minX + dilateRadius);
+      let minY = Math.max(0, bboxes[maxLabel].minY + dilateRadius);
+      let maxX = Math.min(w - 1, bboxes[maxLabel].maxX - dilateRadius);
+      let maxY = Math.min(h - 1, bboxes[maxLabel].maxY - dilateRadius);
 
       const bboxWidth = maxX - minX + 1;
       const bboxHeight = maxY - minY + 1;
 
-      // 5. Guess grid array based on best cell squareness
+      // 5. Flood fill from borders on the DILATED mask to reliably mark the OUTSIDE as -1
+      // This is crucial because heavy dilation seals all gaps (like dashed lines)
+      const qFill = [];
+      const addQueue = (x, y) => {
+        if (x >= 0 && x < w && y >= 0 && y < h) {
+          const i = y * w + x;
+          if (dilated[i] === 0) {
+            dilated[i] = -1; // Mark as outside
+            qFill.push(x, y);
+          }
+        }
+      };
+
+      for (let x = 0; x < w; x++) { addQueue(x, 0); addQueue(x, h - 1); }
+      for (let y = 0; y < h; y++) { addQueue(0, y); addQueue(w - 1, y); }
+
+      let qIterFill = 0;
+      while (qIterFill < qFill.length) {
+        const x = qFill[qIterFill++];
+        const y = qFill[qIterFill++];
+        addQueue(x + 1, y); addQueue(x - 1, y);
+        addQueue(x, y + 1); addQueue(x, y - 1);
+      }
+
+      // 6. Grid Estimation
       let bestCols = 1, bestRows = 1;
       let minDiff = Infinity;
       for (let c = 1; c <= 5; c++) {
@@ -185,7 +276,7 @@ export async function analyzeNetImage(file) {
         for (let c = 0; c < bestCols; c++) {
           let insideCount = 0;
           let totalCount = 0;
-          
+
           const startX = Math.floor(minX + c * cellW);
           const startY = Math.floor(minY + r * cellH);
           const endX = Math.floor(startX + cellW);
@@ -198,7 +289,7 @@ export async function analyzeNetImage(file) {
           for (let y = startY + marginY; y < endY - marginY; y++) {
             for (let x = startX + marginX; x < endX - marginX; x++) {
               if (y >= 0 && y < canvas.height && x >= 0 && x < canvas.width) {
-                if (mask[y * canvas.width + x] !== -1) {
+                if (dilated[y * canvas.width + x] !== -1) {
                   insideCount++;
                 }
                 totalCount++;
@@ -242,20 +333,20 @@ export async function analyzeNetImage(file) {
 
       // We found a match! Slice the textures for each of the 6 faces!
       const extractedFaces = {};
-      
+
       matchedTransform.points.forEach(point => {
         const sx = minX + point.x * cellW;
         const sy = minY + point.y * cellH;
-        
+
         const faceCanvas = document.createElement("canvas");
         const size = Math.max(cellW, cellH);
         faceCanvas.width = 512;
         faceCanvas.height = 512;
         const fCtx = faceCanvas.getContext("2d");
-        
+
         fCtx.imageSmoothingEnabled = true;
         fCtx.imageSmoothingQuality = 'high';
-        
+
         fCtx.fillStyle = '#ffffff';
         fCtx.fillRect(0, 0, 512, 512);
 
@@ -267,8 +358,8 @@ export async function analyzeNetImage(file) {
         }
 
         fCtx.drawImage(
-          canvas, 
-          sx, sy, cellW, cellH, 
+          canvas,
+          sx, sy, cellW, cellH,
           0, 0, 512, 512
         );
         fCtx.restore();
@@ -289,7 +380,7 @@ export async function analyzeNetImage(file) {
         netFlipY: matchedTransform.flipY,
         swapXY: matchedTransform.swapXY
       });
-      
+
     };
     img.onerror = () => reject(new Error("Failed to read image file."));
     img.src = URL.createObjectURL(file);

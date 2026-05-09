@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect } from "react";
 
 const translations = {
   en: {
-    appTitle: "Geometry App",
+    appTitle: "Foldify",
     uploadImage: "Upload Image",
     aiGenerator: "✨ AI Texture Generator",
     aiPlaceholder: "Make a wooden box texture, 4k...",
@@ -30,7 +30,7 @@ const translations = {
     sidebarPos: "Sidebar Position"
   },
   th: {
-    appTitle: "เรขาคณิต 3 มิติ",
+    appTitle: "Foldify",
     uploadImage: "อัปโหลดรูปภาพ",
     aiGenerator: "✨ สร้างพื้นผิวด้วย AI",
     aiPlaceholder: "สร้างลายไม้ สวยๆ 4k...",
