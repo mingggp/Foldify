@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import Sidebar from "./Sidebar";
-import { Focus, Menu, X, SlidersHorizontal, ArrowLeftRight, Rotate3D } from "lucide-react";
+import { Focus, Menu, X, SlidersHorizontal, ArrowLeftRight, Rotate3D, Cuboid } from "lucide-react";
 
 export default function MainLayout({ children, foldProgress, setFoldProgress, facesConfig, setFacesConfig, undoFaces, redoFaces, canUndo, canRedo, selectedFace, setSelectedFace, sidebarPosition, setShowSettingsModal, setShowExportModal, setExportImageBlob, setShowAuthModal, setShowGalleryModal, activeNetId, setActiveNetId, netFlipX, setNetFlipX, netFlipY, setNetFlipY, isAutoRotate, setIsAutoRotate }) {
 
@@ -58,13 +58,21 @@ export default function MainLayout({ children, foldProgress, setFoldProgress, fa
 
         {/* Top-aligned Floating Controls */}
         <div className="absolute top-4 left-4 right-4 z-10 flex justify-between pointer-events-none">
-          {/* Mobile Menu Button */}
-          <button
-            onClick={() => setIsSidebarOpen(true)}
-            className="md:hidden pointer-events-auto flex items-center justify-center p-2.5 bg-white/80 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-800 backdrop-blur-md rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 transition-colors"
-          >
-            <Menu size={20} />
-          </button>
+          {/* Mobile Menu Button + Logo */}
+          <div className="md:hidden pointer-events-auto flex items-center gap-2">
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="flex items-center justify-center p-2.5 bg-white/80 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-800 backdrop-blur-md rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 transition-colors"
+            >
+              <Menu size={20} />
+            </button>
+            <div className="flex items-center gap-2 px-3 py-2 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+              <div className="bg-indigo-600 p-1.5 rounded-lg text-white">
+                <Cuboid size={18} />
+              </div>
+              <span className="text-sm font-bold text-slate-800 dark:text-slate-100">Foldify</span>
+            </div>
+          </div>
 
           <div className="flex-1"></div> {/* Spacer */}
 

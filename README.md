@@ -37,7 +37,7 @@ An interactive web-based 3D box builder application designed for the "Computer E
 1. **Clone the repository:**
    ```bash
    git clone <your-repo-url>
-   cd Foldify
+   cd box-edu-3d
    ```
 
 2. **Install dependencies:**
