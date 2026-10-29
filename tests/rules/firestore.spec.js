@@ -4,6 +4,9 @@ import { readFileSync } from 'node:fs'
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing'
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, query, where, getDocs, serverTimestamp, Timestamp } from 'firebase/firestore'
 
+// All tests share one emulator database, so run them one at a time in order.
+test.describe.configure({ mode: 'default' })
+
 let env
 
 const face = (extra = {}) => ({
