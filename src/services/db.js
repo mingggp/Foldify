@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, query, where, deleteDoc, doc, Timestamp } from "firebase/firestore";
+import { collection, addDoc, getDocs, getDoc, query, where, deleteDoc, updateDoc, doc, serverTimestamp } from "firebase/firestore";
 import { db } from "../config/firebase";
 
 // Helper: compress any image URL (blob: or data:) into a small JPEG data URL
@@ -49,7 +49,9 @@ export const saveBoxConfig = async (userId, payload) => {
       netRotation,
       // v2 = boxes saved after the mirror-image fix (faces are rendered print-side out)
       schemaVersion: 2,
-      createdAt: Timestamp.now(),
+      // Must be the server time — firestore.rules rejects client-supplied dates
+      createdAt: serverTimestamp(),
+      visibility: "private",
       title: `Box Config ${new Date().toLocaleDateString()}`
     });
 
@@ -90,4 +92,15 @@ export const deleteBox = async (boxId) => {
     console.error("Error deleting box:", error);
     throw error;
   }
+};
+
+// Owner only: make a saved box public (anyone with the link can open it) or private again.
+export const setBoxVisibility = async (boxId, visibility) => {
+  await updateDoc(doc(db, "boxes", boxId), { visibility });
+};
+
+// Open a single box by id — works for the owner, or for anyone if the box is public.
+export const getBox = async (boxId) => {
+  const snap = await getDoc(doc(db, "boxes", boxId));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 };

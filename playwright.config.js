@@ -23,6 +23,8 @@ export default defineConfig({
   },
   projects: [
     { name: 'unit', testDir: './tests/unit' },
+    // Needs the Firestore emulator: run with `npm run test:rules`
+    { name: 'rules', testDir: './tests/rules' },
     {
       name: 'e2e',
       testDir: './tests/e2e',

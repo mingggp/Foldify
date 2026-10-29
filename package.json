@@ -8,10 +8,11 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "playwright test",
+    "test": "playwright test --project=unit --project=e2e",
     "test:unit": "playwright test --project=unit",
     "test:e2e": "playwright test --project=e2e",
-    "test:quick": "playwright test --grep-invert @exhaustive"
+    "test:quick": "playwright test --grep-invert @exhaustive --project=unit --project=e2e",
+    "test:rules": "npx -y firebase-tools@15 emulators:exec --only firestore --project demo-foldify \"playwright test --project=rules\""
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
@@ -24,6 +25,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4.2.2",
     "@types/react": "^19.2.14",
