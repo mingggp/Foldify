@@ -7,7 +7,22 @@ import { useLang } from "../../contexts/LanguageContext";
 import { analyzeNetImage } from "../../utils/SmartNetAnalyzer";
 import { useToast } from "../../contexts/ToastContext";
 
-export default function Sidebar({ closeSidebar, facesConfig, setFacesConfig, undoFaces, redoFaces, canUndo, canRedo, selectedFace, setSelectedFace, activeNetId, setActiveNetId, netFlipX, setNetFlipX, netFlipY, setNetFlipY, onExport, setShowAuthModal, setShowGalleryModal, setShowSettingsModal }) {
+// Friendly messages for the AI image endpoint
+function aiErrorMessage(status, info = {}) {
+  if (status === 429) {
+    const wait = info.retryAfter > 90 ? `${Math.ceil(info.retryAfter / 60)} นาที` : `${info.retryAfter || 60} วินาที`;
+    return info.scope === 'global-day'
+      ? 'วันนี้มีคนใช้ AI ครบโควต้าแล้ว ลองใหม่พรุ่งนี้นะ'
+      : `ใช้ AI ถี่ไปนิด รออีก ${wait} แล้วลองใหม่นะ`;
+  }
+  if (info.error === 'prompt_too_long') return `คำอธิบายยาวเกินไป (ไม่เกิน ${info.max} ตัวอักษร)`;
+  if (info.error === 'ai_not_configured') return 'ยังไม่ได้ตั้งค่า HF_TOKEN บนเซิร์ฟเวอร์';
+  if (info.error === 'model_loading') return 'โมเดลกำลังโหลด ลองใหม่อีกครั้งในไม่กี่วินาที';
+  if (status === 504) return 'AI ตอบช้าเกินไป ลองใหม่อีกครั้งนะ';
+  return `สร้างรูปไม่สำเร็จ (${status})`;
+}
+
+export default function Sidebar({ closeSidebar, facesConfig, setFacesConfig, undoFaces, redoFaces, canUndo, canRedo, selectedFace, setSelectedFace, activeNetId, setActiveNetId, netFlipX, setNetFlipX, netFlipY, setNetFlipY, netRotation = 0, setNetRotation, onExport, setShowAuthModal, setShowGalleryModal, setShowSettingsModal }) {
 
   const [aiPrompt, setAiPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -28,12 +43,10 @@ export default function Sidebar({ closeSidebar, facesConfig, setFacesConfig, und
 
     try {
       const result = await analyzeNetImage(file);
-      console.log('[SmartScan] Result:', result);
-      console.log('[SmartScan] Net index:', result.activeNetId, '| flipX:', result.netFlipX, '| flipY:', result.netFlipY, '| swapXY:', result.swapXY);
-      console.log('[SmartScan] Faces extracted:', Object.keys(result.extractedFaces));
       setActiveNetId(result.activeNetId);
       setNetFlipX(result.netFlipX);
       setNetFlipY(result.netFlipY);
+      setNetRotation?.(result.netRotation);
 
       setFacesConfig(prev => {
         const next = { ...prev };
@@ -87,7 +100,7 @@ export default function Sidebar({ closeSidebar, facesConfig, setFacesConfig, und
     if (!currentUser) return setShowAuthModal(true);
     try {
       setIsSaving(true);
-      await saveBoxConfig(currentUser.uid, { facesConfig, activeNetId, netFlipX, netFlipY });
+      await saveBoxConfig(currentUser.uid, { facesConfig, activeNetId, netFlipX, netFlipY, netRotation });
       toast('บันทึกลง Gallery สำเร็จแล้ว! 🎉', 'success');
     } catch (err) {
       console.error(err);
@@ -166,32 +179,21 @@ export default function Sidebar({ closeSidebar, facesConfig, setFacesConfig, und
     setAiError(null);
 
     try {
-      const apiKey = import.meta.env.VITE_HUGGINGFACE_TOKEN;
-      if (!apiKey) {
-        throw new Error("Missing VITE_HUGGINGFACE_TOKEN in .env file.");
-      }
-
-      const response = await fetch(
-        "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell",
-        {
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-          },
-          method: "POST",
-          body: JSON.stringify({ inputs: aiPrompt }),
-        }
-      );
+      // The Hugging Face token now lives on the server (api/generate-image.js).
+      const response = await fetch("/api/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: aiPrompt }),
+      });
 
       if (!response.ok) {
-        let errorTxt = `API Error: ${response.status} ${response.statusText}`;
+        let info = {};
         try {
-          const errObj = await response.json();
-          if (errObj.error) errorTxt = errObj.error;
-        } catch (je) {
-          // ignore json parse error
+          info = await response.json();
+        } catch {
+          // not JSON
         }
-        throw new Error(errorTxt);
+        throw new Error(aiErrorMessage(response.status, info));
       }
 
       const blob = await response.blob();
@@ -317,13 +319,21 @@ export default function Sidebar({ closeSidebar, facesConfig, setFacesConfig, und
               >
                 <FlipVertical size={14} />
               </button>
+              <button
+                onClick={() => setNetRotation?.((netRotation + 1) % 4)}
+                className={`p-1 rounded transition-colors ${netRotation ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
+                title="Rotate Net 90°"
+                aria-label="Rotate net 90 degrees"
+              >
+                <RotateCw size={14} />
+              </button>
             </div>
           </div>
           <div className="px-1 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[10px] uppercase font-bold text-slate-500">Select Net Form</span>
             </div>
-            <NetSelector activeNetId={activeNetId} setActiveNetId={setActiveNetId} netFlipX={netFlipX} netFlipY={netFlipY} />
+            <NetSelector activeNetId={activeNetId} setActiveNetId={setActiveNetId} netFlipX={netFlipX} netFlipY={netFlipY} netRotation={netRotation} />
           </div>
         </div>
 

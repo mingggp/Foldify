@@ -49,6 +49,7 @@ export default function GalleryModal({ isOpen, onClose, onLoadBox }) {
       activeNetId: box.activeNetId,
       netFlipX: box.netFlipX || false,
       netFlipY: box.netFlipY || false,
+      netRotation: box.netRotation || 0,
     });
     onClose();
   };

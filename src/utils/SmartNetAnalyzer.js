@@ -1,95 +1,60 @@
 import { VALID_CUBE_NETS } from "../components/canvas/netsConfig";
+import { allTransforms, layoutNet, layoutSignature, resolveFaceIds } from "../lib/netGeometry";
 
-// Generate 2D signatures for the 11 valid nets automatically
+// Every way each of the 11 nets can lie on the paper: 4 rotations x mirror.
+// IMPORTANT: a photo is never mirrored, so we never flip or transpose the
+// PICTURE. We only work out where the squares are; each square is cut out of
+// the photo exactly as it appears and the 3D net is laid out the same way.
+// (The old version used an x/y swap = a reflection of the image, so the same
+// sheet photographed in portrait vs landscape folded into different boxes.)
 function generateNetSignatures() {
   const signatures = [];
-
   VALID_CUBE_NETS.forEach((net, index) => {
-    // Generate base points
-    const points = [];
-    const traverse = (node, x, y) => {
-      points.push({ id: node.id, x, y });
-      if (node.children) {
-        node.children.forEach(child => {
-          let nx = x, ny = y;
-          if (child.edge === 'top') ny -= 1;
-          else if (child.edge === 'bottom') ny += 1;
-          else if (child.edge === 'left') nx -= 1;
-          else if (child.edge === 'right') nx += 1;
-          traverse(child, nx, ny);
-        });
-      }
-    };
-    traverse(net, 0, 0);
-
-    // Normalize
-    const minX = Math.min(...points.map(p => p.x));
-    const minY = Math.min(...points.map(p => p.y));
-    points.forEach(p => { p.x -= minX; p.y -= minY; });
-
-    const width = Math.max(...points.map(p => p.x)) + 1;
-    const height = Math.max(...points.map(p => p.y)) + 1;
-
-    // Generate 8 transformations (4 rotations x 2 flips)
-    const transforms = [];
-
-    // We'll keep it simple: generate flipX, flipY, and transposed (swap x/y).
-    // This covers all 8 combinations.
-    for (let flipX of [false, true]) {
-      for (let flipY of [false, true]) {
-        for (let swapXY of [false, true]) {
-          const tPoints = points.map(p => {
-            let px = flipX ? (width - 1 - p.x) : p.x;
-            let py = flipY ? (height - 1 - p.y) : p.y;
-            return swapXY ? { id: p.id, x: py, y: px } : { id: p.id, x: px, y: py };
-          });
-
-          const tW = swapXY ? height : width;
-          const tH = swapXY ? width : height;
-
-          // Build string signature e.g., "1100,0110..."
-          let sig = "";
-          for (let y = 0; y < tH; y++) {
-            for (let x = 0; x < tW; x++) {
-              sig += tPoints.some(p => p.x === x && p.y === y) ? "1" : "0";
-            }
-            sig += ",";
-          }
-          sig = sig.slice(0, -1);
-
-          // Check if already added
-          if (!transforms.find(t => t.sig === sig)) {
-            transforms.push({ sig, points: tPoints, columns: tW, rows: tH, flipX, flipY, swapXY });
-          }
-        }
-      }
+    const seen = new Set();
+    for (const transform of allTransforms()) {
+      const layout = layoutNet(net, transform);
+      const sig = layoutSignature(layout);
+      if (seen.has(sig)) continue;
+      seen.add(sig);
+      signatures.push({ index, sig, transform, layout });
     }
-
-    signatures.push({ index, transforms });
   });
-
   return signatures;
 }
 
-const NET_SIGNATURES = generateNetSignatures();
+export const NET_SIGNATURES = generateNetSignatures();
+
+/** Find which net + placement matches an occupancy signature like "0100,1111,0100". */
+export function matchSignature(detectedSig) {
+  return NET_SIGNATURES.find((s) => s.sig === detectedSig) || null;
+}
 
 export async function analyzeNetImage(file) {
+  const img = await new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Failed to read image file."));
+    image.src = URL.createObjectURL(file);
+  });
+  const MAX_DIM = 800;
+  let scale = 1;
+  if (img.width > MAX_DIM || img.height > MAX_DIM) {
+    scale = MAX_DIM / Math.max(img.width, img.height);
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(img.width * scale);
+  canvas.height = Math.round(img.height * scale);
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  URL.revokeObjectURL(img.src);
+  return analyzeNetCanvas(canvas);
+}
+
+/** Analyze a net drawn on a canvas. Exported separately so it can be tested without files. */
+export function analyzeNetCanvas(canvas) {
   return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "Anonymous";
-    img.onload = () => {
-      const MAX_DIM = 800;
-      let scale = 1;
-      if (img.width > MAX_DIM || img.height > MAX_DIM) {
-        scale = MAX_DIM / Math.max(img.width, img.height);
-      }
-
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
+    {
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
 
@@ -313,76 +278,39 @@ export async function analyzeNetImage(file) {
       }
 
       // Match against known signatures
-      let matchedNetIndex = -1;
-      let matchedTransform = null;
-
-      for (const net of NET_SIGNATURES) {
-        for (const transform of net.transforms) {
-          if (transform.sig === detectedSig) {
-            matchedNetIndex = net.index;
-            matchedTransform = transform;
-            break;
-          }
-        }
-        if (matchedNetIndex !== -1) break;
-      }
-
-      if (matchedNetIndex === -1) {
+      const match = matchSignature(detectedSig);
+      if (!match) {
         return reject(new Error("Net pattern recognized, but it is not one of the 11 valid folding cube hexominoes."));
       }
 
-      // We found a match! Slice the textures for each of the 6 faces!
+      // Cut every square out of the photo as-is (no flipping / transposing)
+      // and assign it to the side of the cube that square really folds into.
+      const faceIds = resolveFaceIds(VALID_CUBE_NETS[match.index], match.transform);
       const extractedFaces = {};
-
-      matchedTransform.points.forEach(point => {
-        const sx = minX + point.x * cellW;
-        const sy = minY + point.y * cellH;
-
+      for (const cell of match.layout.cells) {
+        const sx = minX + cell.x * cellW;
+        const sy = minY + cell.y * cellH;
         const faceCanvas = document.createElement("canvas");
-        const size = Math.max(cellW, cellH);
         faceCanvas.width = 512;
         faceCanvas.height = 512;
         const fCtx = faceCanvas.getContext("2d");
-
         fCtx.imageSmoothingEnabled = true;
         fCtx.imageSmoothingQuality = 'high';
-
         fCtx.fillStyle = '#ffffff';
         fCtx.fillRect(0, 0, 512, 512);
-
-        fCtx.save();
-        if (matchedTransform.swapXY) {
-          fCtx.translate(256, 256);
-          fCtx.transform(0, 1, 1, 0, 0, 0); // Transpose the canvas
-          fCtx.translate(-256, -256);
-        }
-
-        fCtx.drawImage(
-          canvas,
-          sx, sy, cellW, cellH,
-          0, 0, 512, 512
-        );
-        fCtx.restore();
-
-        extractedFaces[point.id] = faceCanvas.toDataURL("image/png");
-      });
+        fCtx.drawImage(canvas, sx, sy, cellW, cellH, 0, 0, 512, 512);
+        extractedFaces[faceIds.get(cell.path)] = faceCanvas.toDataURL("image/png");
+      }
 
       resolve({
-        activeNetId: matchedNetIndex,
+        activeNetId: match.index,
         extractedFaces, // { front: dataUrl, top: dataUrl, ... }
-        // We will assume logical coordinates are just mapped, we don't need to change netFlipX/Y 
-        // since our mapping algorithm directly matched the absolute positions! Wait, if the user rotates the 3D model, 
-        // flipping might be needed for the 3D mesh structure to match visually, but mapping 
-        // the faces to the semantic logical IDs guarantees the textures go to the right places.
-        // However, if the net form is flipped horizontally from base, activeNetId doesn't track flips.
-        // The 3D engine uses netFlipX/Y. We should pass them.
-        netFlipX: matchedTransform.flipX,
-        netFlipY: matchedTransform.flipY,
-        swapXY: matchedTransform.swapXY
+        netRotation: match.transform.rotation,
+        netFlipX: match.transform.flipX,
+        netFlipY: match.transform.flipY,
+        signature: detectedSig,
+        grid: { columns: bestCols, rows: bestRows },
       });
-
-    };
-    img.onerror = () => reject(new Error("Failed to read image file."));
-    img.src = URL.createObjectURL(file);
+    }
   });
 }

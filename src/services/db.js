@@ -24,7 +24,7 @@ const compressTextureUrl = (url) => {
 
 export const saveBoxConfig = async (userId, payload) => {
   try {
-    const { facesConfig, activeNetId, netFlipX, netFlipY } = payload;
+    const { facesConfig, activeNetId, netFlipX, netFlipY, netRotation = 0 } = payload;
     
     // Create a copy of config so we don't mutate the UI state unpredictably
     const configToSave = JSON.parse(JSON.stringify(facesConfig));
@@ -46,6 +46,9 @@ export const saveBoxConfig = async (userId, payload) => {
       activeNetId,
       netFlipX,
       netFlipY,
+      netRotation,
+      // v2 = boxes saved after the mirror-image fix (faces are rendered print-side out)
+      schemaVersion: 2,
       createdAt: Timestamp.now(),
       title: `Box Config ${new Date().toLocaleDateString()}`
     });
