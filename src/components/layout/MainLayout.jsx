@@ -9,7 +9,7 @@ import { useLang } from "../../contexts/LanguageContext";
  * App shell. ≥1024px (iPad landscape, PC): the tool panel is docked beside the 3D stage.
  * Narrower (iPad portrait, phones): the panel slides in over the stage.
  */
-export default function MainLayout({ children, foldProgress, setFoldProgress, onPlayFold, sidebarPosition, onOpenShare, onStartQuiz, isQuizOpen, quizPanel, isAutoRotate, setIsAutoRotate, ...panelProps }) {
+export default function MainLayout({ children, foldProgress, setFoldProgress, onPlayFold, sidebarPosition, onOpenShare, onStartQuiz, isQuizOpen, isAutoRotate, setIsAutoRotate, ...panelProps }) {
   const { t } = useLang();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const right = sidebarPosition === "right";
@@ -57,8 +57,6 @@ export default function MainLayout({ children, foldProgress, setFoldProgress, on
             </button>
           </div>
         </div>
-
-        {quizPanel}
 
         {/* fold control */}
         <div className="absolute bottom-4 inset-x-0 z-10 flex justify-center pointer-events-none px-4">

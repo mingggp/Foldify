@@ -1,143 +1,72 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Download, ZoomIn, ZoomOut, RotateCw, RotateCcw, ImageDown, Copy } from 'lucide-react';
-import { useToast } from '../contexts/ToastContext';
-import { useLang } from '../contexts/LanguageContext';
-import Modal, { Segmented } from './ui/Modal';
+import { useEffect, useRef, useState } from "react";
+import { Download, ImageDown, Copy, Loader2 } from "lucide-react";
+import { useToast } from "../contexts/ToastContext";
+import { useLang } from "../contexts/LanguageContext";
+import Modal, { Segmented, Toggle, Range } from "./ui/Modal";
 
-export default function ExportModal({ exportImageBlob, onClose }) {
+const RATIOS = { "1:1": 1, "4:3": 4 / 3, "16:9": 16 / 9 };
+const LONG_SIDE = 2048; // output pixels on the long side — sharp enough to print on a worksheet
+
+/**
+ * Save a picture of the box, e.g. for an exam question.
+ * The preview IS the exported picture (rendered by Scene's ExportRenderer with these options),
+ * so what you see is what you get. Selection highlights are never included.
+ */
+export default function ExportModal({ onClose, showShadows }) {
   const toast = useToast();
   const { t } = useLang();
-  const [zoom, setZoom] = useState(1);
-  const [rotation, setRotation] = useState(0);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  
-  const [aspectRatio, setAspectRatio] = useState('original'); // 'original', '1:1', '16:9', '4:3'
-  
-  const containerRef = useRef(null);
-  
-  const src = exportImageBlob;
-  const [originalRatio, setOriginalRatio] = useState(1);
+  const [opts, setOpts] = useState({ view: "iso", ratio: "1:1", zoom: 1.8, grid: false, shadow: false, background: "white" });
+  const [url, setUrl] = useState(null);
+  const [busy, setBusy] = useState(true);
+  const reqId = useRef(0);
 
+  const set = (patch) => setOpts((o) => ({ ...o, ...patch }));
+
+  // ask the 3D scene for a fresh render whenever an option changes (debounced for the slider)
   useEffect(() => {
-    const img = new Image();
-    img.src = src;
-    img.onload = () => {
-      setOriginalRatio(img.width / img.height);
+    const id = ++reqId.current;
+    const r = RATIOS[opts.ratio];
+    const width = LONG_SIDE;
+    const height = Math.round(LONG_SIDE / r);
+    const onDone = (e) => {
+      if (e.detail?.id !== id) return;
+      setUrl(e.detail.url);
+      setBusy(false);
     };
-  }, [src]);
+    window.addEventListener("export-rendered", onDone);
+    const timer = setTimeout(() => {
+      setBusy(true);
+      window.dispatchEvent(new CustomEvent("export-render", { detail: { id, width, height, ...opts, shadow: opts.shadow && showShadows } }));
+    }, 120);
+    return () => { clearTimeout(timer); window.removeEventListener("export-rendered", onDone); };
+  }, [opts, showShadows]);
 
-  const handleMouseDown = (e) => {
-    setIsDragging(true);
-    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
-  };
+  const fileName = `foldify-${opts.ratio.replace(":", "x")}.png`;
 
-  const handleMouseMove = (e) => {
-    if (!isDragging) return;
-    setPan({
-      x: e.clientX - dragStart.x,
-      y: e.clientY - dragStart.y
-    });
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-
-  const Ratios = {
-    'original': null,
-    '1:1': 1,
-    '16:9': 16 / 9,
-    '4:3': 4 / 3,
-  };
-
-  const generateExportCanvas = () => {
-    return new Promise((resolve) => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      
-      const img = new Image();
-      img.src = src;
-      img.onload = () => {
-        let exportW = img.width;
-        let exportH = img.height;
-
-        const cropBox = document.getElementById('crop-box');
-        if (aspectRatio !== 'original' && cropBox) {
-          const cropRect = cropBox.getBoundingClientRect();
-          exportW = cropRect.width;
-          exportH = cropRect.height;
-        }
-
-        canvas.width = exportW;
-        canvas.height = exportH;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        ctx.translate(canvas.width / 2, canvas.height / 2);
-        ctx.translate(pan.x, pan.y);
-        ctx.scale(zoom, zoom);
-        ctx.rotate(rotation * (Math.PI / 180));
-        
-        ctx.drawImage(img, -img.width / 2, -img.height / 2);
-        resolve(canvas);
-      };
-    });
-  };
-
-  const handleDownload = async () => {
-    const canvas = await generateExportCanvas();
-    const finalImage = canvas.toDataURL("image/png");
+  const handleDownload = () => {
+    if (!url) return;
     const link = document.createElement("a");
-    link.href = finalImage;
-    link.download = `foldify-${aspectRatio.replace(':', 'x')}.png`;
+    link.href = url;
+    link.download = fileName;
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
-    
-    onClose();
+    link.remove();
+    toast(t("exportSaved"), "success");
   };
 
   const handleCopy = async () => {
+    if (!url) return;
     try {
-      const canvas = await generateExportCanvas();
-      canvas.toBlob(async (blob) => {
-        if (!blob) {
-          toast(t('exportFailed'), 'error');
-          return;
-        }
-        
-        // Use the Clipboard API
-        try {
-          const item = new ClipboardItem({ 'image/png': blob });
-          await navigator.clipboard.write([item]);
-          toast(t('exportCopied'), 'success');
-          onClose();
-        } catch (err) {
-          console.error('Clipboard write error:', err);
-          toast(t('exportClipboardBlocked'), 'error');
-        }
-      }, 'image/png');
+      const blob = await (await fetch(url)).blob();
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      toast(t("exportCopied"), "success");
     } catch (err) {
       console.error(err);
-      toast(t('exportFailed'), 'error');
+      toast(t("exportClipboardBlocked"), "error");
     }
   };
 
-  // Compute CSS style for the crop overlay box
-  const getCropOverlayStyle = () => {
-    const targetRatio = aspectRatio === 'original' ? originalRatio : Ratios[aspectRatio];
-    // We try to maximize the crop box within the preview area visually!
-    return {
-      aspectRatio: targetRatio,
-      width: targetRatio > 1 ? '90%' : 'auto',
-      height: targetRatio <= 1 ? '90%' : 'auto',
-      maxHeight: '90%',
-      maxWidth: '90%',
-    };
-  };
-
-  const tool = "flex items-center gap-1 p-1 rounded-xl bg-surface-2 border border-line";
+  const ratio = RATIOS[opts.ratio];
   return (
     <Modal
       title={t("exportTitle")}
@@ -149,88 +78,52 @@ export default function ExportModal({ exportImageBlob, onClose }) {
       testId="export"
       footer={
         <>
-          <div className="flex flex-wrap gap-2 mr-auto">
-            <Segmented
-              value={aspectRatio}
-              onChange={setAspectRatio}
-              label={t("exportRatio")}
-              options={[
-                { value: "original", label: t("exportOriginal") },
-                { value: "1:1", label: "1:1" },
-                { value: "4:3", label: "4:3" },
-                { value: "16:9", label: "16:9" },
-              ]}
-            />
-            <div className={tool}>
-              <button onClick={() => setZoom(Math.max(0.1, zoom - 0.1))} className="btn btn-ghost btn-icon min-h-8 min-w-8" aria-label={t("zoomOut")}><ZoomOut size={16} /></button>
-              <span className="text-xs w-10 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
-              <button onClick={() => setZoom(Math.min(5, zoom + 0.1))} className="btn btn-ghost btn-icon min-h-8 min-w-8" aria-label={t("zoomIn")}><ZoomIn size={16} /></button>
-            </div>
-            <div className={tool}>
-              <button onClick={() => setRotation((r) => r - 15)} className="btn btn-ghost btn-icon min-h-8 min-w-8" aria-label={t("turnLeft")}><RotateCcw size={16} /></button>
-              <span className="text-xs w-10 text-center tabular-nums">{rotation}°</span>
-              <button onClick={() => setRotation((r) => r + 15)} className="btn btn-ghost btn-icon min-h-8 min-w-8" aria-label={t("turnRight")}><RotateCw size={16} /></button>
-              <button onClick={() => { setZoom(1); setRotation(0); setPan({ x: 0, y: 0 }); }} className="btn btn-ghost min-h-8 text-xs px-2">{t("reset")}</button>
-            </div>
-          </div>
-          <button onClick={handleCopy} className="btn btn-soft h-11"><Copy size={17} />{t("exportCopy")}</button>
-          <button onClick={handleDownload} className="btn btn-primary h-11"><Download size={17} />{t("exportSave")}</button>
+          <button onClick={handleCopy} disabled={!url || busy} className="btn btn-soft h-11"><Copy size={17} />{t("exportCopy")}</button>
+          <button onClick={handleDownload} disabled={!url || busy} className="btn btn-primary h-11" data-testid="export-save"><Download size={17} />{t("exportSave")}</button>
         </>
       }
     >
-      <div
-        ref={containerRef}
-        className="relative h-[55dvh] rounded-2xl overflow-hidden checkered-bg flex items-center justify-center select-none"
-      >
-        {/* draggable image */}
-        <div
-          className="w-full h-full absolute inset-0 cursor-grab active:cursor-grabbing flex items-center justify-center"
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-        >
-          <img
-            src={src}
-            alt=""
-            draggable={false}
-            style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom}) rotate(${rotation}deg)`, transition: isDragging ? "none" : "transform 0.1s ease-out" }}
-            className="max-w-full max-h-full object-contain pointer-events-none opacity-40"
-          />
+      <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_16rem]">
+        {/* preview = the exported picture */}
+        <div className="relative grid place-items-center rounded-2xl bg-surface-2 border border-line p-3">
+          <div className={`relative w-full ${opts.background === "white" ? "bg-white" : "checkered-bg"} shadow-sm`} style={{ aspectRatio: ratio, maxWidth: `min(100%, calc(58dvh * ${ratio}))` }}>
+            {url && <img src={url} alt={t("exportPreview")} className="absolute inset-0 w-full h-full" data-testid="export-preview" />}
+          </div>
+          {busy && <Loader2 size={26} className="absolute animate-spin text-mint" />}
         </div>
 
-        {/* crop frame */}
-        <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-          <div
-            id="crop-box"
-            className="relative z-10 border-2 border-mint shadow-[0_0_0_9999px_rgb(3_22_26/0.55)] overflow-hidden flex items-center justify-center rounded-md"
-            style={getCropOverlayStyle()}
-          >
-            <img
-              src={src}
-              alt={t("exportPreview")}
-              draggable={false}
-              className="absolute object-none max-w-none pointer-events-none"
-              style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom}) rotate(${rotation}deg)` }}
-            />
-            <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 opacity-25">
-              {Array.from({ length: 9 }, (_, i) => (
-                <div key={i} className={`${i % 3 < 2 ? "border-r" : ""} ${i < 6 ? "border-b" : ""} border-white`} />
-              ))}
-            </div>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <span className="text-sm font-semibold">{t("exportView")}</span>
+            <Segmented full value={opts.view} onChange={(v) => set({ view: v })} label={t("exportView")} options={[{ value: "iso", label: t("exportIso") }, { value: "current", label: t("exportCurrent") }]} />
+          </div>
+          <div className="space-y-2">
+            <span className="text-sm font-semibold">{t("exportRatio")}</span>
+            <Segmented full value={opts.ratio} onChange={(v) => set({ ratio: v })} label={t("exportRatio")} options={Object.keys(RATIOS).map((k) => ({ value: k, label: k }))} />
+          </div>
+          <label className="block space-y-1">
+            <span className="flex justify-between text-sm font-semibold">{t("exportZoom")}<span className="text-muted tabular-nums font-normal">{Math.round(opts.zoom * 100)}%</span></span>
+            <Range className="w-full" min={0.5} max={3} step={0.05} value={opts.zoom} onChange={(v) => set({ zoom: v })} aria-label={t("exportZoom")} data-testid="export-zoom" />
+          </label>
+          <div className="space-y-2">
+            <span className="text-sm font-semibold">{t("exportBackground")}</span>
+            <Segmented full value={opts.background} onChange={(v) => set({ background: v })} label={t("exportBackground")} options={[{ value: "white", label: t("exportWhite") }, { value: "transparent", label: t("exportTransparent") }]} />
+          </div>
+          <div>
+            <Toggle label={t("exportGrid")} checked={opts.grid} onChange={(v) => set({ grid: v })} testId="export-grid" />
+            {showShadows && <Toggle label={t("exportShadow")} checked={opts.shadow} onChange={(v) => set({ shadow: v })} />}
           </div>
         </div>
       </div>
 
-      {/* checkered background so transparent snapshots look right */}
       <style>{`
         .checkered-bg {
-          background-color: var(--surface-2);
+          background-color: #ffffff;
           background-image:
-            linear-gradient(45deg, var(--line) 25%, transparent 25%),
-            linear-gradient(-45deg, var(--line) 25%, transparent 25%),
-            linear-gradient(45deg, transparent 75%, var(--line) 75%),
-            linear-gradient(-45deg, transparent 75%, var(--line) 75%);
+            linear-gradient(45deg, #e6ecec 25%, transparent 25%),
+            linear-gradient(-45deg, #e6ecec 25%, transparent 25%),
+            linear-gradient(45deg, transparent 75%, #e6ecec 75%),
+            linear-gradient(-45deg, transparent 75%, #e6ecec 75%);
           background-size: 20px 20px;
           background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
         }

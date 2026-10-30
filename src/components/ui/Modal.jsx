@@ -109,3 +109,21 @@ export function Segmented({ value, onChange, options, label, size = "sm", full =
     </div>
   );
 }
+
+/** Slider with a filled track and a clear round thumb (styled in index.css). */
+export function Range({ value, min = 0, max = 100, step = 1, onChange, className = "", ...rest }) {
+  const p = ((value - min) / (max - min)) * 100;
+  return (
+    <input
+      type="range"
+      min={min}
+      max={max}
+      step={step}
+      value={value}
+      onChange={(e) => onChange(parseFloat(e.target.value))}
+      className={`range ${className}`}
+      style={{ "--p": `${Math.max(0, Math.min(100, p))}%` }}
+      {...rest}
+    />
+  );
+}

@@ -12,11 +12,14 @@ import GalleryModal from './components/gallery/GalleryModal';
 import SettingsModal from './components/SettingsModal';
 import { useHistory } from './hooks/useHistory';
 import ShareModal from './components/share/ShareModal';
-import QuizPanel from './components/quiz/QuizPanel';
+import QuizModal from './components/quiz/QuizModal';
+import * as cubeQuiz from './lib/cubeQuiz';
+import { drawShapes } from './lib/shapes';
+import { layoutNet } from './lib/netGeometry';
+import { VALID_CUBE_NETS } from './components/canvas/netsConfig';
 import ShapeEditor from './components/editor/ShapeEditor';
 import { parseShareLink, labelsToFaces } from './lib/shareLink';
 import { makeLabelTexture } from './lib/labelTexture';
-import { makeOppositeQuestion, randomPracticeNet } from './lib/quiz';
 import { getBox } from './services/db';
 
 const blankFace = () => ({ color: "#ffffff", textureUrl: null, aiImageUrl: null, userImageUrl: null, rotation: 0, flipX: false, flipY: false, shapes: [], activeShapeIndex: null });
@@ -76,7 +79,6 @@ function AppContent() {
   const [netFlipY, setNetFlipY] = useState(false);
   const [netRotation, setNetRotation] = useState(initialNet ? initialNet.transform.rotation : 0); // clockwise quarter turns of the net on paper
   const [showExportModal, setShowExportModal] = useState(false);
-  const [exportImageBlob, setExportImageBlob] = useState(null);
   const [isAutoRotate, setIsAutoRotate] = useState(false);
   
   // Settings & Navigation States
@@ -160,59 +162,21 @@ function AppContent() {
     return map;
   }, [setFacesConfig]);
 
-  // ---- guess before folding ----
-  const [quiz, setQuiz] = useState(() =>
-    initialNet?.quiz && hasLabels(initialFaceLabels)
-      ? { question: makeOppositeQuestion(initialFaceLabels), picked: null, score: { correct: 0, total: 0 }, snapshot: null, notice: false }
-      : null
+  // ---- guess before folding (exam-style question made from the current box) ----
+  const [showQuiz, setShowQuiz] = useState(() => !!(initialNet?.quiz && hasLabels(initialFaceLabels)));
+  const quizDesign = useMemo(
+    () => (showQuiz ? { netIndex: activeNetId, transform: netTransform, facesConfig } : null),
+    // the question is made once when the dialog opens; edits behind it don't matter
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [showQuiz]
   );
-
-  const startQuiz = () => {
+  const showFold = () => {
+    setShowQuiz(false);
     setSelectedFace(null);
-    if (hasLabels(liveLabels)) {
-      setQuiz({ question: makeOppositeQuestion(liveLabels), picked: null, score: { correct: 0, total: 0 }, snapshot: null, notice: false });
-    } else {
-      // No labels yet: practise on a random lettered net, give the design back afterwards
-      const snapshot = { facesConfig, activeNetId, netTransform, foldProgress, faceLabels };
-      const r = randomPracticeNet();
-      const map = applyLabels(r.netIndex, r.transform, r.labels, r.turns);
-      setQuiz({ question: makeOppositeQuestion(map), picked: null, score: { correct: 0, total: 0 }, snapshot, notice: true });
-    }
-    animateFold(0, 600);
-  };
-  const answerQuiz = (faceId) => {
-    if (!quiz || quiz.picked != null) return;
-    const ok = faceId === quiz.question.answerFaceId;
-    setQuiz({ ...quiz, picked: faceId, score: { correct: quiz.score.correct + (ok ? 1 : 0), total: quiz.score.total + 1 } });
-    setSelectedFace(quiz.question.answerFaceId);
-    animateFold(1);
-  };
-  const nextQuizQuestion = () => {
-    setSelectedFace(null);
-    setQuiz((q) => ({ ...q, picked: null, question: makeOppositeQuestion(liveLabels, Math.random, q.question.faceId) }));
-    animateFold(0, 900);
-  };
-  const newQuizNet = () => {
-    setSelectedFace(null);
-    const r = randomPracticeNet();
-    const map = applyLabels(r.netIndex, r.transform, r.labels, r.turns);
-    setQuiz((q) => ({ ...q, picked: null, question: makeOppositeQuestion(map), notice: false }));
     cancelAnimationFrame(foldAnim.current);
+    foldRef.current = 0;
     setFoldProgress(0);
-  };
-  const closeQuiz = () => {
-    const snap = quiz?.snapshot;
-    setQuiz(null);
-    setSelectedFace(null);
-    if (snap) {
-      setFacesConfig(snap.facesConfig);
-      setActiveNetId(snap.activeNetId);
-      setNetRotation(snap.netTransform.rotation);
-      setNetFlipX(snap.netTransform.flipX);
-      setNetFlipY(snap.netTransform.flipY);
-      setFaceLabels(snap.faceLabels);
-      setFoldByHand(snap.foldProgress);
-    }
+    setTimeout(() => animateFold(1, 1800), 250);
   };
 
   const handleLoadBox = (savedData) => {
@@ -253,9 +217,11 @@ function AppContent() {
         setNetFlipY(flipY);
       },
       applyLabels,
-      state: { foldProgress, activeNetId, netRotation, netFlipX, netFlipY, facesConfig, showLabels, faceLabels, quiz },
+      cubeQuiz, drawShapes,
+      layoutNet: (i, t) => layoutNet(VALID_CUBE_NETS[i], t),
+      state: { foldProgress, activeNetId, netRotation, netFlipX, netFlipY, facesConfig, showLabels, faceLabels, showQuiz },
     });
-  }, [foldProgress, activeNetId, netRotation, netFlipX, netFlipY, facesConfig, showLabels, setFacesConfig, faceLabels, quiz, applyLabels]);
+  }, [foldProgress, activeNetId, netRotation, netFlipX, netFlipY, facesConfig, showLabels, setFacesConfig, faceLabels, showQuiz, applyLabels]);
 
   // Keyboard listener for Undo/Redo
   useEffect(() => {
@@ -277,9 +243,8 @@ function AppContent() {
         onPlayFold={playFold}
         onOpenShapeEditor={() => { setSelectedFace((f) => f || "front"); setShowShapeEditor(true); }}
         onOpenShare={() => setShowShareModal(true)}
-        onStartQuiz={startQuiz}
-        isQuizOpen={!!quiz}
-        quizPanel={<QuizPanel quiz={quiz} onAnswer={answerQuiz} onNext={nextQuizQuestion} onNewNet={newQuizNet} onClose={closeQuiz} />}
+        onStartQuiz={() => { setSelectedFace(null); setShowQuiz(true); }}
+        isQuizOpen={showQuiz}
         facesConfig={facesConfig}
         setFacesConfig={setFacesConfig}
         undoFaces={undoFaces}
@@ -291,7 +256,6 @@ function AppContent() {
         sidebarPosition={sidebarPosition}
         setShowSettingsModal={setShowSettingsModal}
         setShowExportModal={setShowExportModal}
-        setExportImageBlob={setExportImageBlob}
         setShowAuthModal={setShowAuthModal}
         setShowGalleryModal={setShowGalleryModal}
         activeNetId={activeNetId}
@@ -333,12 +297,7 @@ function AppContent() {
             showLabels={showLabels}
           />
         </Scene>
-        {showExportModal && (
-          <ExportModal 
-            exportImageBlob={exportImageBlob} 
-            onClose={() => setShowExportModal(false)}
-          />
-        )}
+        {showExportModal && <ExportModal onClose={() => setShowExportModal(false)} showShadows={showShadows} />}
       </MainLayout>
 
       <SettingsModal 
@@ -377,6 +336,7 @@ function AppContent() {
           canRedo={canRedo}
         />
       )}
+      {showQuiz && quizDesign && <QuizModal design={quizDesign} onClose={() => setShowQuiz(false)} onShowFold={showFold} />}
       <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
       <GalleryModal isOpen={showGalleryModal} onClose={() => setShowGalleryModal(false)} onLoadBox={handleLoadBox} />
     </>

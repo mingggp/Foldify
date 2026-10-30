@@ -4,7 +4,7 @@ import {
 } from '../../src/lib/shareLink.js'
 import { layoutNet, layoutSignature, allTransforms } from '../../src/lib/netGeometry.js'
 import { VALID_CUBE_NETS } from '../../src/components/canvas/netsConfig.js'
-import { makeOppositeQuestion, randomPracticeNet, OPPOSITE } from '../../src/lib/quiz.js'
+import { randomPracticeNet } from '../../src/lib/quiz.js'
 
 const BASE = 'https://foldify.example/'
 
@@ -75,16 +75,12 @@ test('labels follow paper reading order (left→right, top→bottom)', () => {
   expect(facesToLabels(0, {}, faces).labels).toEqual(['A', 'B', 'C', 'D', 'E', 'F'])
 })
 
-test('quiz: answer is always the opposite face, choices are the other 5', () => {
+test('practice net: six different letters on a real net', () => {
   let seed = 1
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
   for (let i = 0; i < 200; i++) {
     const r = randomPracticeNet(rnd)
-    const q = makeOppositeQuestion(r.faceLabels, rnd)
-    expect(q.answerFaceId).toBe(OPPOSITE[q.faceId])
-    expect(q.choices).toHaveLength(5)
-    expect(q.choices.map((c) => c.faceId)).not.toContain(q.faceId)
-    expect(q.choices.map((c) => c.faceId)).toContain(q.answerFaceId)
+    expect(Object.keys(r.faceLabels).sort()).toEqual(['back', 'bottom', 'front', 'left', 'right', 'top'])
     expect(new Set(Object.values(r.faceLabels).map((l) => l.label)).size).toBe(6)
   }
 })
