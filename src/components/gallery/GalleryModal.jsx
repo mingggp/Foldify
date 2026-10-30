@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
-import { getUserBoxes, deleteBox } from "../../services/db";
-import { X, Loader2, Trash2, Box, Calendar } from "lucide-react";
+import { getUserBoxes, deleteBox, setBoxVisibility } from "../../services/db";
+import { X, Loader2, Trash2, Box, Calendar, Share2, Globe } from "lucide-react";
+import { QrBlock } from "../share/ShareModal";
+import { appBaseUrl, buildShareLink } from "../../lib/shareLink";
+import { useLang } from "../../contexts/LanguageContext";
 import { useToast } from "../../contexts/ToastContext";
 
 export default function GalleryModal({ isOpen, onClose, onLoadBox }) {
@@ -9,6 +12,24 @@ export default function GalleryModal({ isOpen, onClose, onLoadBox }) {
   const toast = useToast();
   const [boxes, setBoxes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [sharing, setSharing] = useState(null); // box being shared
+  const [busy, setBusy] = useState(false);
+  const { t } = useLang();
+
+  const setVisibility = async (box, visibility) => {
+    try {
+      setBusy(true);
+      await setBoxVisibility(box.id, visibility);
+      const updated = { ...box, visibility };
+      setBoxes((prev) => prev.map((b) => (b.id === box.id ? updated : b)));
+      setSharing(updated);
+    } catch (err) {
+      console.error(err);
+      toast('เปลี่ยนการแชร์ไม่สำเร็จ', 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (isOpen && currentUser) {
@@ -58,7 +79,7 @@ export default function GalleryModal({ isOpen, onClose, onLoadBox }) {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-slate-900 w-full max-w-4xl max-h-[80vh] rounded-2xl shadow-xl flex flex-col border border-slate-200 dark:border-slate-800 animate-in slide-in-from-bottom-4 duration-300">
+      <div className="relative bg-white dark:bg-slate-900 w-full max-w-4xl max-h-[80vh] rounded-2xl shadow-xl flex flex-col border border-slate-200 dark:border-slate-800 animate-in slide-in-from-bottom-4 duration-300">
         
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
@@ -112,8 +133,19 @@ export default function GalleryModal({ isOpen, onClose, onLoadBox }) {
                   </div>
                   
                   <div className="p-4 flex flex-col flex-1">
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-bold text-slate-800 dark:text-slate-200">{box.title || "Untitled Box"}</h3>
+                    <div className="flex justify-between items-start mb-2 gap-2">
+                      <h3 className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 min-w-0">
+                        {box.visibility === 'public' && <Globe size={14} className="text-emerald-500 shrink-0" aria-label="public" />}
+                        <span className="truncate">{box.title || "Untitled Box"}</span>
+                      </h3>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setSharing(box); }}
+                        title={t('share')}
+                        aria-label={t('share')}
+                        className="ml-auto text-slate-400 hover:text-indigo-500 bg-slate-50 dark:bg-slate-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 p-1.5 rounded-lg transition-colors"
+                      >
+                        <Share2 size={16} />
+                      </button>
                       <button 
                         onClick={(e) => handleDelete(e, box.id)}
                         className="text-slate-400 hover:text-red-500 bg-slate-50 dark:bg-slate-700 hover:bg-red-50 dark:hover:bg-red-900/30 p-1.5 rounded-lg transition-colors"
@@ -136,6 +168,31 @@ export default function GalleryModal({ isOpen, onClose, onLoadBox }) {
             </div>
           )}
         </div>
+
+        {sharing && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-900/40 rounded-2xl p-4" onClick={() => setSharing(null)}>
+            <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+              <div className="flex justify-between items-center">
+                <h3 className="font-bold text-slate-800 dark:text-slate-100 truncate">{sharing.title || 'Untitled Box'}</h3>
+                <button onClick={() => setSharing(null)} aria-label={t('quizClose')} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg"><X size={16} /></button>
+              </div>
+              {sharing.visibility === 'public' ? (
+                <>
+                  <p className="text-xs text-emerald-600 flex items-center gap-1.5"><Globe size={14} />{t('shareBoxPublic')}</p>
+                  <QrBlock link={buildShareLink(appBaseUrl(), { box: sharing.id })} fileName={`foldify-box-${sharing.id}.png`} />
+                  <button disabled={busy} onClick={() => setVisibility(sharing, 'private')} className="w-full py-2 rounded-lg text-sm font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 disabled:opacity-50">
+                    {t('shareMakePrivate')}
+                  </button>
+                </>
+              ) : (
+                <button disabled={busy} onClick={() => setVisibility(sharing, 'public')} className="w-full py-2 rounded-lg text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 flex items-center justify-center gap-2">
+                  {busy ? <Loader2 size={16} className="animate-spin" /> : <Share2 size={16} />}
+                  {t('shareMakePublic')}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

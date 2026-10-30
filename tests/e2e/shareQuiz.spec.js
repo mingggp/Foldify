@@ -1,0 +1,125 @@
+import { test, expect } from '@playwright/test'
+import { installProbe, setAllFaceTextures, settle } from './helpers.js'
+
+test.use({ viewport: { width: 1280, height: 800 } })
+
+const ready = (page) => page.waitForFunction(() => window.__foldify?.three && window.__foldify?.state, null, { timeout: 30_000 })
+const state = (page) => page.evaluate(() => {
+  const s = window.__foldify.state
+  return {
+    faceLabels: s.faceLabels,
+    rotations: Object.fromEntries(Object.entries(s.facesConfig).map(([k, v]) => [k, v.rotation])),
+    hasPicture: Object.fromEntries(Object.entries(s.facesConfig).map(([k, v]) => [k, !!v.textureUrl])),
+    net: s.activeNetId, rot: s.netRotation, flipX: s.netFlipX, fold: s.foldProgress,
+  }
+})
+
+test('a worksheet link opens the right net with labels on the right squares', async ({ page }) => {
+  await page.goto('/?v=1&net=1&labels=ABCDEF&turn=010000&fold=0')
+  await ready(page)
+  const s = await state(page)
+  expect(s.net).toBe(0)
+  // Net 1 in reading order: back, left, top, right, front, bottom
+  expect(Object.fromEntries(Object.entries(s.faceLabels).map(([k, v]) => [k, v.label])))
+    .toEqual({ back: 'A', left: 'B', top: 'C', right: 'D', front: 'E', bottom: 'F' })
+  expect(s.rotations.left).toBe(90) // turn=0 1 0 0 0 0 -> second square turned once
+  expect(Object.values(s.hasPicture).every(Boolean)).toBe(true)
+})
+
+test('a rotated / mirrored net from a link is laid out as written', async ({ page }) => {
+  await page.goto('/?v=1&net=4&labels=ABCDEF&rot=1&flip=1&fold=100')
+  await ready(page)
+  const s = await state(page)
+  expect([s.net, s.rot, s.flipX, s.fold]).toEqual([3, 1, true, 1])
+})
+
+test('face "turn" rotates the picture clockwise as seen from outside', async ({ page }) => {
+  await page.goto('/')
+  await ready(page)
+  await page.evaluate(() => { const f = window.__foldify; f.setShowShadows(false); f.setShowGrid(false); f.setSelectedFace(null) })
+  await installProbe(page)
+  await setAllFaceTextures(page)
+  await page.evaluate(() => window.__foldify.setFacesConfig((prev) => Object.fromEntries(Object.entries(prev).map(([k, v]) => [k, { ...v, rotation: 90 }]))))
+  await settle(page, 4)
+  for (const fold of [0, 1]) {
+    await page.evaluate((f) => window.__foldify.setFoldProgress(f), fold)
+    await settle(page)
+    const faces = await page.evaluate(() => window.__foldify.inspectFaces())
+    // picture turned 90° clockwise: old bottom-left (green) is now top-left, old top-left (red) top-right
+    for (const f of faces) expect(f.seen, `${f.faceId} fold ${fold}`).toEqual({ TL: 'green', TR: 'red', BL: 'yellow', BR: 'blue' })
+  }
+})
+
+test('guess mode from a link: answer, watch it fold, next question', async ({ page }) => {
+  await page.goto('/?v=1&net=1&labels=ABCDEF&quiz=1')
+  await ready(page)
+  const panel = page.getByTestId('quiz-panel')
+  await expect(panel).toBeVisible()
+  const asked = await page.getByTestId('quiz-question').getAttribute('data-face')
+  const opposite = { top: 'bottom', bottom: 'top', front: 'back', back: 'front', left: 'right', right: 'left' }[asked]
+  await expect(page.getByTestId('quiz-choice')).toHaveCount(5)
+  await page.locator(`[data-testid=quiz-choice][data-face=${opposite}]`).click()
+  await expect(page.getByTestId('quiz-result')).toHaveAttribute('data-correct', 'true')
+  await expect(page.getByTestId('quiz-score')).toContainText('1/1')
+  await page.waitForFunction(() => window.__foldify.state.foldProgress === 1, null, { timeout: 5000 })
+
+  await page.getByTestId('quiz-next').click()
+  await page.waitForFunction(() => window.__foldify.state.foldProgress === 0, null, { timeout: 5000 })
+  const asked2 = await page.getByTestId('quiz-question').getAttribute('data-face')
+  expect(asked2).not.toBe(asked)
+  // a wrong answer is marked wrong and shows the right one
+  const wrong = await page.locator(`[data-testid=quiz-choice]:not([data-face=${{ top: 'bottom', bottom: 'top', front: 'back', back: 'front', left: 'right', right: 'left' }[asked2]}])`).first()
+  await wrong.click()
+  await expect(page.getByTestId('quiz-result')).toHaveAttribute('data-correct', 'false')
+  await expect(page.getByTestId('quiz-score')).toContainText('1/2')
+})
+
+test('guess mode on an unlabelled design practises on letters, then gives the design back', async ({ page }) => {
+  await page.goto('/')
+  await ready(page)
+  await page.evaluate(() => window.__foldify.setNetTransform({ rotation: 2 }))
+  await page.waitForFunction(() => window.__foldify.state.netRotation === 2)
+  const before = await state(page)
+  await page.getByTestId('open-quiz').click()
+  await expect(page.getByTestId('quiz-panel')).toBeVisible()
+  const during = await state(page)
+  expect(Object.values(during.faceLabels).map((l) => l.label).sort()).toEqual(['A', 'B', 'C', 'D', 'E', 'F'])
+  await page.getByTestId('quiz-choice').first().click()
+  await page.getByTestId('quiz-new-net').click()
+  await page.getByRole('button', { name: /close|ปิด/i }).first().click()
+  await expect(page.getByTestId('quiz-panel')).toHaveCount(0)
+  const after = await state(page)
+  expect(after.faceLabels).toEqual({})
+  expect(after.hasPicture).toEqual(before.hasPicture)
+  expect([after.net, after.rot]).toEqual([before.net, before.rot])
+})
+
+test('Share dialog: type labels, get a link + QR that reopens the same box', async ({ page, context }) => {
+  await page.goto('/')
+  await ready(page)
+  await page.evaluate(() => { window.__foldify.setActiveNetId(2); window.__foldify.setNetTransform({ rotation: 1 }) })
+  await page.waitForFunction(() => window.__foldify.state.activeNetId === 2 && window.__foldify.state.netRotation === 1)
+  await page.getByTestId('open-share').click()
+  const letters = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ']
+  for (let i = 0; i < 6; i++) await page.getByTestId(`share-label-${i}`).fill(letters[i])
+  await page.getByTestId('share-turn-2').click()
+  await page.getByTestId('share-quiz').check()
+  await expect(page.getByTestId('share-qr')).toBeVisible()
+  const link = await page.getByTestId('share-link').inputValue()
+  expect(link).toContain('v=1')
+  expect(link).toContain('net=3')
+  expect(link).toContain('rot=1')
+  expect(link).toContain('turn=001000')
+  expect(link).toContain('quiz=1')
+
+  await page.getByRole('button', { name: /Use these labels|ใช้ตัวอักษรนี้/ }).click()
+  const applied = await state(page)
+
+  const other = await context.newPage()
+  await other.goto(link)
+  await ready(other)
+  const opened = await state(other)
+  expect(opened.faceLabels).toEqual(applied.faceLabels)
+  expect([opened.net, opened.rot]).toEqual([2, 1])
+  await expect(other.getByTestId('quiz-panel')).toBeVisible()
+})
