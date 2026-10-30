@@ -1,80 +1,88 @@
-import { Cuboid, PaintBucket, Download, Settings, X, SlidersHorizontal, ImagePlus, Trash2, FlipHorizontal, FlipVertical, RotateCcw, RotateCw, Moon, Sun, Grid3x3, LightbulbOff, Lightbulb, Square, Circle, Star, Trash, Loader2, Save, LogOut, LogIn, Image as ImageIcon, ChevronDown, ChevronRight } from "lucide-react";
+import { Download, Settings, X, ImagePlus, Trash2, FlipHorizontal, FlipVertical, RotateCcw, RotateCw, Undo2, Redo2, Square, Circle, Star, Loader2, Save, LogOut, LogIn, Images, ScanLine, Copy, ClipboardPaste, Shuffle, Eraser, Plus } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import NetSelector from "../NetSelector";
+import Logo from "../ui/Logo";
+import { Segmented } from "../ui/Modal";
 import { useAuth } from "../../contexts/AuthContext";
 import { saveBoxConfig } from "../../services/db";
 import { useLang } from "../../contexts/LanguageContext";
 import { analyzeNetImage } from "../../utils/SmartNetAnalyzer";
 import { useToast } from "../../contexts/ToastContext";
 
-export default function Sidebar({ closeSidebar, facesConfig, setFacesConfig, undoFaces, redoFaces, canUndo, canRedo, selectedFace, setSelectedFace, activeNetId, setActiveNetId, netFlipX, setNetFlipX, netFlipY, setNetFlipY, netRotation = 0, setNetRotation, onExport, setShowAuthModal, setShowGalleryModal, setShowSettingsModal }) {
+const FACE_ORDER = ["top", "front", "left", "right", "back", "bottom"];
+const SWATCHES = ["#ffffff", "#28a1ab", "#00c8b5", "#00d5c9", "#ffb238", "#ff7a59", "#f7a8c4", "#8b7cf6", "#4f8ef7", "#9be15d", "#94a3b8", "#1e293b"];
 
+function IconButton({ label, children, ...rest }) {
+  return (
+    <button title={label} aria-label={label} className="btn btn-ghost btn-icon" {...rest}>
+      {children}
+    </button>
+  );
+}
+
+export default function Sidebar({ closeSidebar, quizOpen, facesConfig, setFacesConfig, undoFaces, redoFaces, canUndo, canRedo, selectedFace, setSelectedFace, activeNetId, setActiveNetId, netFlipX, setNetFlipX, netFlipY, setNetFlipY, netRotation = 0, setNetRotation, setShowAuthModal, setShowGalleryModal, setShowSettingsModal, setShowExportModal, setExportImageBlob }) {
   const [isSaving, setIsSaving] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
   const [clipboardFaceConfig, setClipboardFaceConfig] = useState(null);
-  const [isSetupOpen, setIsSetupOpen] = useState(false);
+  const [tab, setTab] = useState("net");
+  // clicking a face in 3D jumps to the "decorate" tab
+  const [seenFace, setSeenFace] = useState(selectedFace);
+  if (seenFace !== selectedFace) {
+    setSeenFace(selectedFace);
+    if (selectedFace && !quizOpen) setTab("face");
+  }
 
   const { currentUser, logout } = useAuth();
   const { t } = useLang();
   const toast = useToast();
-
   const smartScanInputRef = useRef(null);
+
+  const face = selectedFace ? facesConfig[selectedFace] : null;
 
   const handleSmartScan = async (e) => {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
-
+    setIsScanning(true);
     try {
       const result = await analyzeNetImage(file);
       setActiveNetId(result.activeNetId);
       setNetFlipX(result.netFlipX);
       setNetFlipY(result.netFlipY);
       setNetRotation?.(result.netRotation);
-
-      setFacesConfig(prev => {
+      setFacesConfig((prev) => {
         const next = { ...prev };
-        for (const face of ['top', 'bottom', 'left', 'right', 'front', 'back']) {
-          if (result.extractedFaces[face]) {
-            next[face] = { ...next[face], textureUrl: result.extractedFaces[face] };
-          }
+        for (const id of FACE_ORDER) {
+          if (result.extractedFaces[id]) next[id] = { ...next[id], textureUrl: result.extractedFaces[id] };
         }
         return next;
       });
-      toast('✨ แสกนสำเร็จ! แปลงรูปคลี่ลง 3D Box เรียบร้อยแล้ว', 'success');
+      toast(t("scanDone"), "success");
+      closeSidebar?.();
     } catch (err) {
-      toast(err.message, 'error');
+      toast(err.message, "error");
+    } finally {
+      setIsScanning(false);
     }
-    // reset input
-    e.target.value = '';
   };
 
   const handleRandomize = () => {
-    setFacesConfig(prev => {
-      const newConfig = { ...prev };
-      Object.keys(newConfig).forEach(key => {
-        newConfig[key] = {
-          ...newConfig[key],
-          color: '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')
-        };
+    setFacesConfig((prev) => {
+      const next = { ...prev };
+      Object.keys(next).forEach((key) => {
+        next[key] = { ...next[key], color: SWATCHES[1 + Math.floor(Math.random() * (SWATCHES.length - 1))] };
       });
-      return newConfig;
+      return next;
     });
   };
 
   const handleSetAllWhite = () => {
-    setFacesConfig(prev => {
-      const newConfig = { ...prev };
-      Object.keys(newConfig).forEach(key => {
-        newConfig[key] = {
-          ...newConfig[key],
-          color: '#ffffff',
-          textureUrl: null,
-          userImageUrl: null,
-          aiImageUrl: null,
-          shapes: [],
-          activeShapeIndex: null
-        };
+    setFacesConfig((prev) => {
+      const next = { ...prev };
+      Object.keys(next).forEach((key) => {
+        next[key] = { ...next[key], color: "#ffffff", textureUrl: null, userImageUrl: null, aiImageUrl: null, shapes: [], activeShapeIndex: null };
       });
-      return newConfig;
+      return next;
     });
   };
 
@@ -83,523 +91,307 @@ export default function Sidebar({ closeSidebar, facesConfig, setFacesConfig, und
     try {
       setIsSaving(true);
       await saveBoxConfig(currentUser.uid, { facesConfig, activeNetId, netFlipX, netFlipY, netRotation });
-      toast('บันทึกลง Gallery สำเร็จแล้ว! 🎉', 'success');
+      toast(t("saved"), "success");
     } catch (err) {
       console.error(err);
-      toast('บันทึกไม่สำเร็จ กรุณาลองใหม่', 'error');
+      toast(t("saveFailed"), "error");
     } finally {
       setIsSaving(false);
     }
   };
 
   const updateFaceConfig = (key, value) => {
-    setFacesConfig(prev => ({
-      ...prev,
-      [selectedFace]: { ...prev[selectedFace], [key]: value }
-    }));
+    if (!selectedFace) return;
+    setFacesConfig((prev) => ({ ...prev, [selectedFace]: { ...prev[selectedFace], [key]: value } }));
   };
 
   const handleAddShape = (type) => {
-    setFacesConfig(prev => {
+    if (!selectedFace) return;
+    setFacesConfig((prev) => {
       const currentShapes = prev[selectedFace].shapes || [];
-      const newShape = {
-        id: Date.now(),
-        type,
-        x: 512,
-        y: 512,
-        scale: 1,
-        rotation: 0,
-        color: prev[selectedFace].color === '#ffffff' ? '#4f46e5' : '#ffffff'
-      };
-      return {
-        ...prev,
-        [selectedFace]: {
-          ...prev[selectedFace],
-          shapes: [...currentShapes, newShape],
-          activeShapeIndex: currentShapes.length
-        }
-      };
+      const newShape = { id: Date.now(), type, x: 512, y: 512, scale: 1, rotation: 0, color: prev[selectedFace].color === "#ffffff" ? "#28a1ab" : "#ffffff" };
+      return { ...prev, [selectedFace]: { ...prev[selectedFace], shapes: [...currentShapes, newShape], activeShapeIndex: currentShapes.length } };
     });
   };
 
   const handleUpdateShape = (updates) => {
-    setFacesConfig(prev => {
-      const currentFace = prev[selectedFace];
-      const idx = currentFace.activeShapeIndex;
+    setFacesConfig((prev) => {
+      const current = prev[selectedFace];
+      const idx = current.activeShapeIndex;
       if (idx === null || idx === undefined) return prev;
-      const newShapes = [...currentFace.shapes];
-      newShapes[idx] = { ...newShapes[idx], ...updates };
-      return {
-        ...prev,
-        [selectedFace]: { ...currentFace, shapes: newShapes }
-      };
+      const shapes = [...current.shapes];
+      shapes[idx] = { ...shapes[idx], ...updates };
+      return { ...prev, [selectedFace]: { ...current, shapes } };
     });
   };
 
   const handleDeleteShape = () => {
-    setFacesConfig(prev => {
-      const currentFace = prev[selectedFace];
-      const idx = currentFace.activeShapeIndex;
+    setFacesConfig((prev) => {
+      const current = prev[selectedFace];
+      const idx = current.activeShapeIndex;
       if (idx === null || idx === undefined) return prev;
-      const newShapes = currentFace.shapes.filter((_, i) => i !== idx);
-      return {
-        ...prev,
-        [selectedFace]: { ...currentFace, shapes: newShapes, activeShapeIndex: null }
-      };
+      return { ...prev, [selectedFace]: { ...current, shapes: current.shapes.filter((_, i) => i !== idx), activeShapeIndex: null } };
     });
   };
 
-  const handleColorChange = (e) => updateFaceConfig('color', e.target.value);
-
   const handleImageUpload = (e) => {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
-    const imageUrl = URL.createObjectURL(file);
-    updateFaceConfig('textureUrl', imageUrl);
+    updateFaceConfig("textureUrl", URL.createObjectURL(file));
   };
 
-  const handleRemoveImage = () => {
-    updateFaceConfig('textureUrl', null);
-  };
-
-  const handleCopyFace = () => {
-    setClipboardFaceConfig(facesConfig[selectedFace]);
-  };
-
-  const handlePasteFace = () => {
-    if (clipboardFaceConfig) {
-      setFacesConfig(prev => ({
-        ...prev,
-        [selectedFace]: { ...clipboardFaceConfig }
-      }));
-    }
-  };
-
-  // Custom event listener for snapshot
+  // snapshot from Scene.jsx -> export dialog
   useEffect(() => {
     const onSnapshotReady = (e) => {
-      onExport(e.detail);
+      setExportImageBlob(e.detail);
+      setShowExportModal(true);
     };
-    window.addEventListener('snapshot-ready', onSnapshotReady);
-    return () => window.removeEventListener('snapshot-ready', onSnapshotReady);
-  }, [onExport]);
+    window.addEventListener("snapshot-ready", onSnapshotReady);
+    return () => window.removeEventListener("snapshot-ready", onSnapshotReady);
+  }, [setExportImageBlob, setShowExportModal]);
 
-  const handleExportImage = () => {
-    // Trigger the snapshot helper inside Scene.jsx which will safely hide UI and capture
-    window.dispatchEvent(new CustomEvent('trigger-snapshot'));
-  };
+  const activeShape = face && face.activeShapeIndex != null ? face.shapes?.[face.activeShapeIndex] : null;
 
   return (
-    <aside className="w-80 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 shadow-sm flex flex-col h-full z-10 transition-colors">
-      <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-white dark:bg-slate-800">
-        <div className="flex items-center gap-3">
-          <div className="bg-indigo-600 p-2 rounded-lg text-white">
-            <Cuboid size={24} />
-          </div>
-          <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">{t('appTitle')}</h2>
-        </div>
-        <div className="flex gap-1.5">
-          <button
-            onClick={() => setShowSettingsModal(true)}
-            className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg dark:text-slate-400 dark:hover:bg-slate-700 transition-colors"
-            title={t('settings')}
-          >
-            <Settings size={20} />
-          </button>
-
-          {/* Mobile close button */}
-          <button
-            onClick={closeSidebar}
-            className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg dark:text-slate-400 dark:hover:bg-slate-700 transition-colors md:hidden"
-          >
-            <X size={20} />
-          </button>
+    <aside className="glass max-lg:bg-surface h-full lg:rounded-[26px] flex flex-col overflow-hidden">
+      {/* header */}
+      <div className="px-4 pt-4 pb-3 flex items-center justify-between">
+        <Logo />
+        <div className="flex gap-1">
+          <IconButton label={t("settings")} onClick={() => setShowSettingsModal(true)}>
+            <Settings size={19} />
+          </IconButton>
+          <span className="lg:hidden">
+            <IconButton label={t("close")} onClick={closeSidebar}>
+              <X size={19} />
+            </IconButton>
+          </span>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-hide">
-
-        {/* Prominent Smart Scan Button */}
-        <div className="relative group cursor-pointer overflow-hidden rounded-xl" onClick={() => smartScanInputRef.current?.click()}>
-          <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-xl blur opacity-70 dark:opacity-50 group-hover:opacity-100 transition duration-300 animate-gradient-xy"></div>
-          <div className="relative bg-white dark:bg-slate-800 border border-indigo-100 dark:border-indigo-900/50 p-4 rounded-xl shadow-sm flex flex-col items-center justify-center gap-2 transition-transform group-hover:scale-[1.02] overflow-hidden">
-            <div className="shimmer-effect"></div>
-            <span className="text-3xl relative z-10 animate-bounce" style={{ animationDuration: '3s' }}>🤖</span>
-            <div className="text-center relative z-10">
-              <h4 className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 text-sm">Smart Scan Net</h4>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">อัปโหลดรูปคลี่ AI จะสร้าง 3D Box ให้ทันที!</p>
-            </div>
-          </div>
-          <input
-            type="file"
-            ref={smartScanInputRef}
-            className="hidden"
-            accept="image/*"
-            onChange={handleSmartScan}
-          />
-        </div>
-
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-              <Cuboid size={14} />
-              {t('netGeometry')}
-            </h3>
-            <div className="flex gap-1 border border-slate-200 dark:border-slate-700 rounded bg-slate-50 dark:bg-slate-800 p-0.5 shadow-sm">
-              <button
-                onClick={() => setNetFlipX(!netFlipX)}
-                className={`p-1 rounded transition-colors ${netFlipX ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
-                title="Flip Topology Horizontally"
-              >
-                <FlipHorizontal size={14} />
-              </button>
-              <button
-                onClick={() => setNetFlipY(!netFlipY)}
-                className={`p-1 rounded transition-colors ${netFlipY ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
-                title="Flip Topology Vertically"
-              >
-                <FlipVertical size={14} />
-              </button>
-              <button
-                onClick={() => setNetRotation?.((netRotation + 1) % 4)}
-                className={`p-1 rounded transition-colors ${netRotation ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
-                title="Rotate Net 90°"
-                aria-label="Rotate net 90 degrees"
-              >
-                <RotateCw size={14} />
-              </button>
-            </div>
-          </div>
-          <div className="px-1 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase font-bold text-slate-500">Select Net Form</span>
-            </div>
-            <NetSelector activeNetId={activeNetId} setActiveNetId={setActiveNetId} netFlipX={netFlipX} netFlipY={netFlipY} netRotation={netRotation} />
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <div className="flex items-center justify-between bg-white dark:bg-slate-800 p-2 rounded-lg border border-slate-100 dark:border-slate-700 shadow-sm">
-            <div
-              className="flex items-center gap-1 cursor-pointer flex-1 group"
-              onClick={() => setIsSetupOpen(!isSetupOpen)}
-            >
-              <div className="text-slate-400 group-hover:text-indigo-500 transition-colors">
-                {isSetupOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-              </div>
-              <h3 className="text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                {t('face')} Setup
-              </h3>
-
-              <div className="flex gap-0.5 ml-2" onClick={(e) => e.stopPropagation()}>
-                <button
-                  onClick={undoFaces} disabled={!canUndo}
-                  className={`p-1 rounded ${canUndo ? 'text-indigo-600 hover:bg-slate-200 dark:text-indigo-400 dark:hover:bg-slate-700 cursor-pointer' : 'text-slate-300 dark:text-slate-600 cursor-not-allowed'}`}
-                  title="Undo (Ctrl+Z)"
-                >
-                  <RotateCcw size={12} />
-                </button>
-                <button
-                  onClick={redoFaces} disabled={!canRedo}
-                  className={`p-1 rounded ${canRedo ? 'text-indigo-600 hover:bg-slate-200 dark:text-indigo-400 dark:hover:bg-slate-700 cursor-pointer' : 'text-slate-300 dark:text-slate-600 cursor-not-allowed'}`}
-                  title="Redo (Ctrl+Shift+Z)"
-                >
-                  <RotateCw size={12} />
-                </button>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={handleSetAllWhite}
-                className="text-[10px] px-1.5 py-1 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 rounded font-bold shadow-sm hover:bg-slate-200 transition-colors"
-                title="Set All Clear"
-              >
-                ⚪
-              </button>
-              <button
-                onClick={handleRandomize}
-                className="text-[10px] px-1.5 py-1 bg-gradient-to-r from-pink-500 to-orange-400 text-white rounded font-bold shadow hover:scale-105 transition-transform flex items-center gap-1"
-              >
-                🎲 {t('randomize')}
-              </button>
-            </div>
-          </div>
-
-          {isSetupOpen && (
-            <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl space-y-4 shadow-sm animate-in slide-in-from-top-2 fade-in duration-200">
-
-              {/* Active Face Indication */}
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Editing Face:</span>
-                  <div className="flex bg-slate-200 dark:bg-slate-700/50 rounded-md p-0.5">
-                    <button
-                      onClick={handleCopyFace}
-                      className="px-2 py-0.5 text-[10px] font-bold text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-600 rounded shadow-sm transition-all"
-                      title="Copy Design"
-                    >
-                      Copy
-                    </button>
-                    <button
-                      onClick={handlePasteFace}
-                      disabled={!clipboardFaceConfig}
-                      className={`px-2 py-0.5 text-[10px] font-bold rounded transition-all ${clipboardFaceConfig ? 'text-indigo-600 dark:text-indigo-400 hover:bg-white dark:hover:bg-slate-600 shadow-sm' : 'text-slate-400 dark:text-slate-600 cursor-not-allowed'}`}
-                      title="Paste Design"
-                    >
-                      Paste
-                    </button>
-                  </div>
-                </div>
-                <div className="px-3 py-2 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 rounded-lg flex items-center justify-between">
-                  <span className="text-sm font-semibold uppercase text-indigo-700 dark:text-indigo-400">
-                    {selectedFace}
-                  </span>
-                  <span className="text-[10px] text-indigo-400 dark:text-indigo-500 bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded shadow-sm border border-indigo-50 dark:border-slate-700">3D Interactive</span>
-                </div>
-              </div>
-
-              {/* Color Picker */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-600">Base Color</label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="color"
-                    value={facesConfig[selectedFace].color}
-                    onChange={handleColorChange}
-                    className="w-10 h-10 rounded cursor-pointer border-0 p-0"
-                  />
-                  <span className="text-sm text-slate-600 uppercase font-mono bg-white px-2 py-1 border border-slate-200 rounded">
-                    {facesConfig[selectedFace].color}
-                  </span>
-                </div>
-              </div>
-
-              {/* Shapes / Canvas Editor */}
-              <div className="space-y-2 pt-3 border-t border-slate-200 dark:border-slate-700">
-                <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Add Stickers</label>
-                <div className="flex gap-2">
-                  <button onClick={() => handleAddShape('square')} className="flex-1 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded flex justify-center items-center" title="Square">
-                    <Square size={16} />
-                  </button>
-                  <button onClick={() => handleAddShape('circle')} className="flex-1 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded flex justify-center items-center" title="Circle">
-                    <Circle size={16} />
-                  </button>
-                  <button onClick={() => handleAddShape('star')} className="flex-1 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded flex justify-center items-center" title="Star">
-                    <Star size={16} />
-                  </button>
-                </div>
-
-                {/* Active Shape Editor */}
-                {facesConfig[selectedFace].activeShapeIndex !== null && facesConfig[selectedFace].activeShapeIndex !== undefined && facesConfig[selectedFace].shapes[facesConfig[selectedFace].activeShapeIndex] && (
-                  <div className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg space-y-3 mt-3 shadow-sm">
-                    <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-2">
-                      <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase">
-                        Edit {facesConfig[selectedFace].shapes[facesConfig[selectedFace].activeShapeIndex].type}
-                      </span>
-                      <button onClick={handleDeleteShape} className="text-red-500 hover:text-red-700 bg-red-50 dark:bg-red-900/30 p-1 rounded">
-                        <Trash size={14} />
-                      </button>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <div className="flex-1 space-y-1">
-                        <label className="text-[10px] font-medium text-slate-500 dark:text-slate-400">X Pos (0-1024)</label>
-                        <input type="range" min="0" max="1024" value={facesConfig[selectedFace].shapes[facesConfig[selectedFace].activeShapeIndex].x} onChange={e => handleUpdateShape({ x: parseInt(e.target.value) })} className="w-full accent-indigo-600 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer" />
-                      </div>
-                      <div className="flex-1 space-y-1">
-                        <label className="text-[10px] font-medium text-slate-500 dark:text-slate-400">Y Pos (0-1024)</label>
-                        <input type="range" min="0" max="1024" value={facesConfig[selectedFace].shapes[facesConfig[selectedFace].activeShapeIndex].y} onChange={e => handleUpdateShape({ y: parseInt(e.target.value) })} className="w-full accent-indigo-600 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer" />
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <div className="flex-1 space-y-1">
-                        <label className="text-[10px] font-medium text-slate-500 dark:text-slate-400">Scale</label>
-                        <input type="range" min="0.1" max="5" step="0.1" value={facesConfig[selectedFace].shapes[facesConfig[selectedFace].activeShapeIndex].scale} onChange={e => handleUpdateShape({ scale: parseFloat(e.target.value) })} className="w-full accent-indigo-600 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer" />
-                      </div>
-                      <div className="flex-1 space-y-1">
-                        <label className="text-[10px] font-medium text-slate-500 dark:text-slate-400">Rotate</label>
-                        <input type="range" min="0" max="360" value={facesConfig[selectedFace].shapes[facesConfig[selectedFace].activeShapeIndex].rotation} onChange={e => handleUpdateShape({ rotation: parseInt(e.target.value) })} className="w-full accent-indigo-600 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer" />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 pt-1">
-                      <label className="text-[10px] font-medium text-slate-500 dark:text-slate-400">Fill</label>
-                      <input type="color" value={facesConfig[selectedFace].shapes[facesConfig[selectedFace].activeShapeIndex].color} onChange={e => handleUpdateShape({ color: e.target.value })} className="w-8 h-8 rounded cursor-pointer border border-slate-200 dark:border-slate-600 p-0 bg-transparent" />
-                    </div>
-                  </div>
-                )}
-
-                {facesConfig[selectedFace].shapes.length > 0 && facesConfig[selectedFace].activeShapeIndex === null && (
-                  <div className="flex gap-1.5 flex-wrap mt-3">
-                    {facesConfig[selectedFace].shapes.map((s, i) => (
-                      <button key={s.id} onClick={() => updateFaceConfig('activeShapeIndex', i)} className="px-2 py-1 text-[10px] bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-md border border-indigo-100 dark:border-indigo-800 uppercase font-medium hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors">
-                        Select {s.type}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Image Upload */}
-              <div className="space-y-1.5 pt-3 border-t border-slate-200 dark:border-slate-700">
-                <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Texture Image</label>
-
-                {facesConfig[selectedFace].textureUrl ? (
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center justify-between bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 p-2 rounded-lg shadow-sm">
-                      <div className="flex items-center gap-2 truncate">
-                        <div className="w-8 h-8 rounded bg-slate-100 dark:bg-slate-700 overflow-hidden flex-shrink-0">
-                          <img src={facesConfig[selectedFace].textureUrl} alt="Texture" className="w-full h-full object-cover" />
-                        </div>
-                        <span className="text-xs text-slate-500 dark:text-slate-400 truncate">Image Applied</span>
-                      </div>
-                      <button
-                        onClick={handleRemoveImage}
-                        className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md transition-colors"
-                        title="Remove Image"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-
-                    {/* Texture Controls */}
-                    <div className="space-y-3 pt-2">
-                      {/* Rotation */}
-                      <div className="space-y-1">
-                        <div className="flex justify-between items-center text-xs font-medium text-slate-600 dark:text-slate-400">
-                          <span>Rotation</span>
-                          <span>{facesConfig[selectedFace].rotation}°</span>
-                        </div>
-                        <div className="flex gap-2 items-center py-1">
-                          <input
-                            type="range"
-                            min="0" max="360" step="1"
-                            value={facesConfig[selectedFace].rotation}
-                            onChange={(e) => updateFaceConfig('rotation', parseInt(e.target.value))}
-                            className="flex-1 accent-indigo-600 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
-                          />
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => updateFaceConfig('rotation', (facesConfig[selectedFace].rotation - 90 + 360) % 360)}
-                            className="flex-1 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 rounded text-xs flex justify-center items-center gap-1"
-                          >
-                            <RotateCcw size={12} /> -90°
-                          </button>
-                          <button
-                            onClick={() => updateFaceConfig('rotation', (facesConfig[selectedFace].rotation + 90) % 360)}
-                            className="flex-1 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 rounded text-xs flex justify-center items-center gap-1"
-                          >
-                            <RotateCw size={12} /> +90°
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Flipping */}
-                      <div className="space-y-1">
-                        <div className="text-xs font-medium text-slate-600 dark:text-slate-400">Flip</div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => updateFaceConfig('flipX', !facesConfig[selectedFace].flipX)}
-                            className={`flex-1 py-1.5 border rounded flex justify-center items-center gap-1.5 transition-colors ${facesConfig[selectedFace].flipX ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400' : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400'}`}
-                          >
-                            <FlipHorizontal size={14} /> <span className="text-xs">Horiz</span>
-                          </button>
-                          <button
-                            onClick={() => updateFaceConfig('flipY', !facesConfig[selectedFace].flipY)}
-                            className={`flex-1 py-1.5 border rounded flex justify-center items-center gap-1.5 transition-colors ${facesConfig[selectedFace].flipY ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400' : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400'}`}
-                          >
-                            <FlipVertical size={14} /> <span className="text-xs">Vert</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <label className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 border-dashed text-slate-600 dark:text-slate-400 rounded-xl transition-colors cursor-pointer text-sm font-medium">
-                    <ImagePlus size={18} className="text-indigo-500" />
-                    <span>Upload Image</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="hidden"
-                    />
-                  </label>
-                )}
-              </div>
-
-
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="p-4 border-t border-slate-100 dark:border-slate-800 space-y-3 bg-white dark:bg-slate-800">
-
-        {/* Auth & Gallery Zone (Highlighted!) */}
-        <div className="bg-indigo-50/70 border border-indigo-100 dark:bg-slate-900/50 dark:border-slate-700 rounded-xl p-3 space-y-3">
-          {/* User Auth Section */}
-          {currentUser ? (
-            <div className="flex items-center justify-between bg-white dark:bg-slate-800 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700">
-              <div className="flex items-center gap-2 truncate pr-2">
-                <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold text-[10px]">
-                  {currentUser.email.charAt(0).toUpperCase()}
-                </div>
-                <span className="text-xs font-medium text-slate-600 dark:text-slate-300 truncate">
-                  {currentUser.email}
-                </span>
-              </div>
-              <button
-                onClick={logout}
-                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
-                title="Logout"
-              >
-                <LogOut size={14} />
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setShowAuthModal(true)}
-              className="w-full flex items-center justify-center gap-2 py-2 border border-indigo-300 dark:border-indigo-800/80 bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-lg transition-colors text-sm font-medium shadow-sm"
-            >
-              <LogIn size={16} />
-              {t('loginRegister')}
-            </button>
-          )}
-
-          {/* Action Buttons */}
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={handleSaveBox}
-              disabled={isSaving}
-              className="flex flex-col items-center justify-center gap-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors text-xs font-bold shadow-md shadow-indigo-600/20"
-            >
-              {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-              {isSaving ? t('saving') : t('saveBox')}
-            </button>
-
-            <button
-              onClick={() => {
-                if (currentUser) setShowGalleryModal(true);
-                else setShowAuthModal(true);
-              }}
-              className="flex flex-col items-center justify-center gap-1 py-2 bg-white border border-slate-200 dark:bg-slate-800 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition-colors text-xs font-bold shadow-sm"
-            >
-              <ImageIcon size={18} />
-              {t('myGallery')}
-            </button>
-          </div>
-        </div>
-
+      <div className="flex-1 overflow-y-auto scroll-area scrollbar-hide px-4 pb-4 space-y-4">
+        {/* Smart Scan — the most used action, always on top */}
         <button
-          onClick={handleExportImage}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded-lg transition-colors font-medium text-sm shadow-sm"
+          type="button"
+          onClick={() => smartScanInputRef.current?.click()}
+          disabled={isScanning}
+          data-testid="smart-scan"
+          className="group relative w-full text-left rounded-2xl p-[1.5px] bg-[linear-gradient(135deg,#00d5c9,#28a1ab_55%,#00c8b5)] shadow-[0_10px_24px_-12px_rgb(0_160_150/0.7)] transition-transform active:scale-[0.99]"
         >
-          <Download size={16} />
-          {t('exportImage')}
+          <span className="relative flex items-center gap-3 rounded-[15px] bg-surface/95 px-4 py-3.5 overflow-hidden">
+            <span className="relative grid place-items-center w-12 h-12 rounded-xl bg-mint/15 text-brand-ink shrink-0 overflow-hidden">
+              {isScanning ? <Loader2 size={24} className="animate-spin" /> : <ScanLine size={24} />}
+              <span className={`absolute inset-x-1.5 top-1/2 h-0.5 bg-mint rounded-full ${isScanning ? "animate-[scanline_1.1s_ease-in-out_infinite]" : "group-hover:animate-[scanline_1.1s_ease-in-out_infinite]"}`} />
+            </span>
+            <span className="min-w-0">
+              <span className="block font-display font-semibold text-[15px] leading-tight">{isScanning ? t("scanBusy") : t("scanTitle")}</span>
+              <span className="block hint mt-1">{t("scanHint")}</span>
+            </span>
+          </span>
         </button>
+        <input type="file" ref={smartScanInputRef} className="hidden" accept="image/*" onChange={handleSmartScan} />
+
+        <Segmented
+          value={tab}
+          onChange={setTab}
+          label={t("panel")}
+          size="md"
+          full
+          options={[
+            { value: "net", label: t("tabNet") },
+            { value: "face", label: t("tabFace") },
+          ]}
+        />
+
+        {tab === "net" && (
+          <section className="space-y-3 anim-rise" key="net">
+            <NetSelector activeNetId={activeNetId} setActiveNetId={setActiveNetId} netFlipX={netFlipX} netFlipY={netFlipY} netRotation={netRotation} />
+            <div className="grid grid-cols-3 gap-2">
+              <button onClick={() => setNetRotation?.((netRotation + 1) % 4)} className={`btn btn-soft text-xs flex-col h-14 gap-1 ${netRotation ? "btn-on" : ""}`} aria-label="Rotate net 90 degrees">
+                <RotateCw size={17} />
+                {t("netRotate")}
+              </button>
+              <button onClick={() => setNetFlipX(!netFlipX)} aria-pressed={netFlipX} className={`btn btn-soft text-xs flex-col h-14 gap-1 ${netFlipX ? "btn-on" : ""}`}>
+                <FlipHorizontal size={17} />
+                {t("netFlipH")}
+              </button>
+              <button onClick={() => setNetFlipY(!netFlipY)} aria-pressed={netFlipY} className={`btn btn-soft text-xs flex-col h-14 gap-1 ${netFlipY ? "btn-on" : ""}`}>
+                <FlipVertical size={17} />
+                {t("netFlipV")}
+              </button>
+            </div>
+            <p className="hint">{t("netHint")}</p>
+          </section>
+        )}
+
+        {tab === "face" && (
+          <section className="space-y-4 anim-rise" key="face">
+            {/* which face */}
+            <div className="grid grid-cols-6 gap-1.5" role="radiogroup" aria-label={t("pickFace")}>
+              {FACE_ORDER.map((id) => {
+                const f = facesConfig[id];
+                const on = selectedFace === id;
+                return (
+                  <button
+                    key={id}
+                    role="radio"
+                    aria-checked={on}
+                    data-testid={`face-chip-${id}`}
+                    onClick={() => setSelectedFace(id)}
+                    className={`flex flex-col items-center gap-1 rounded-xl py-1.5 border transition-colors ${on ? "border-spark bg-spark/15" : "border-transparent hover:bg-surface-2"}`}
+                  >
+                    <span className="w-7 h-7 rounded-md border border-line bg-center bg-cover" style={{ backgroundColor: f.color, backgroundImage: f.textureUrl ? `url("${f.textureUrl}")` : undefined }} />
+                    <span className="text-[11px] font-semibold leading-none">{t(`face_${id}`)}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center justify-between -mx-1">
+              <div className="flex">
+                <IconButton label={t("undo")} onClick={undoFaces} disabled={!canUndo}><Undo2 size={17} /></IconButton>
+                <IconButton label={t("redo")} onClick={redoFaces} disabled={!canRedo}><Redo2 size={17} /></IconButton>
+                <IconButton label={t("copyFace")} onClick={() => face && setClipboardFaceConfig(face)} disabled={!face}><Copy size={17} /></IconButton>
+                <IconButton label={t("pasteFace")} onClick={() => setFacesConfig((prev) => ({ ...prev, [selectedFace]: { ...clipboardFaceConfig } }))} disabled={!face || !clipboardFaceConfig}><ClipboardPaste size={17} /></IconButton>
+              </div>
+              <div className="flex">
+                <IconButton label={t("randomize")} onClick={handleRandomize}><Shuffle size={17} /></IconButton>
+                <IconButton label={t("clearAll")} onClick={handleSetAllWhite}><Eraser size={17} /></IconButton>
+              </div>
+            </div>
+
+            {!face ? (
+              <p className="hint rounded-xl border border-dashed border-line p-4 text-center">{t("noFaceSelected")}</p>
+            ) : (
+              <>
+                {/* colour */}
+                <div className="space-y-2">
+                  <h3 className="section-title">{t("faceColor")}</h3>
+                  <div className="grid grid-cols-7 gap-1.5">
+                    {SWATCHES.map((c) => (
+                      <button
+                        key={c}
+                        onClick={() => updateFaceConfig("color", c)}
+                        aria-label={c}
+                        aria-pressed={face.color === c}
+                        className={`aspect-square rounded-lg border transition-transform hover:scale-105 ${face.color === c ? "ring-2 ring-mint ring-offset-2 ring-offset-surface border-transparent" : "border-line"}`}
+                        style={{ background: c }}
+                      />
+                    ))}
+                    <label className="aspect-square rounded-lg border border-line grid place-items-center cursor-pointer relative overflow-hidden" title={t("customColor")} style={{ background: "conic-gradient(#ff7a59,#ffb238,#9be15d,#00c8b5,#4f8ef7,#8b7cf6,#f7a8c4,#ff7a59)" }}>
+                      <Plus size={14} className="text-white drop-shadow" />
+                      <input type="color" value={face.color} onChange={(e) => updateFaceConfig("color", e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer" aria-label={t("customColor")} />
+                    </label>
+                  </div>
+                </div>
+
+                {/* picture */}
+                <div className="space-y-2">
+                  <h3 className="section-title">{t("picture")}</h3>
+                  {face.textureUrl ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-3 rounded-xl border border-line p-2 bg-surface-2">
+                        <img src={face.textureUrl} alt="" className="w-12 h-12 rounded-lg object-cover bg-white" style={{ transform: `rotate(${face.rotation}deg) scale(${face.flipX ? -1 : 1}, ${face.flipY ? -1 : 1})` }} />
+                        <span className="flex-1 text-sm text-muted">{face.rotation}°</span>
+                        <IconButton label={t("removePicture")} onClick={() => updateFaceConfig("textureUrl", null)}><Trash2 size={17} /></IconButton>
+                      </div>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        <button className="btn btn-soft btn-icon" title={t("turnLeft")} aria-label={t("turnLeft")} onClick={() => updateFaceConfig("rotation", (face.rotation - 90 + 360) % 360)}><RotateCcw size={16} /></button>
+                        <button className="btn btn-soft btn-icon" title={t("turnRight")} aria-label={t("turnRight")} onClick={() => updateFaceConfig("rotation", (face.rotation + 90) % 360)}><RotateCw size={16} /></button>
+                        <button className={`btn btn-soft btn-icon ${face.flipX ? "btn-on" : ""}`} title={t("flipH")} aria-label={t("flipH")} aria-pressed={!!face.flipX} onClick={() => updateFaceConfig("flipX", !face.flipX)}><FlipHorizontal size={16} /></button>
+                        <button className={`btn btn-soft btn-icon ${face.flipY ? "btn-on" : ""}`} title={t("flipV")} aria-label={t("flipV")} aria-pressed={!!face.flipY} onClick={() => updateFaceConfig("flipY", !face.flipY)}><FlipVertical size={16} /></button>
+                      </div>
+                      <input type="range" min="0" max="359" step="1" value={face.rotation} onChange={(e) => updateFaceConfig("rotation", parseInt(e.target.value))} className="mini w-full" aria-label={t("pictureAngle")} />
+                    </div>
+                  ) : (
+                    <label className="btn btn-soft w-full h-12 border-dashed cursor-pointer">
+                      <ImagePlus size={18} className="text-brand-ink" />
+                      {t("uploadPicture")}
+                      <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                    </label>
+                  )}
+                </div>
+
+                {/* stickers */}
+                <div className="space-y-2">
+                  <h3 className="section-title">{t("stickers")}</h3>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <button onClick={() => handleAddShape("square")} className="btn btn-soft" aria-label={t("stickerSquare")} title={t("stickerSquare")}><Square size={16} /></button>
+                    <button onClick={() => handleAddShape("circle")} className="btn btn-soft" aria-label={t("stickerCircle")} title={t("stickerCircle")}><Circle size={16} /></button>
+                    <button onClick={() => handleAddShape("star")} className="btn btn-soft" aria-label={t("stickerStar")} title={t("stickerStar")}><Star size={16} /></button>
+                  </div>
+
+                  {activeShape ? (
+                    <div className="rounded-xl border border-line bg-surface-2 p-3 space-y-2 anim-rise">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-semibold">{t(`sticker_${activeShape.type}`)}</span>
+                        <div className="flex items-center gap-1">
+                          <label className="w-8 h-8 rounded-lg border border-line cursor-pointer relative overflow-hidden" style={{ background: activeShape.color }} title={t("stickerColor")}>
+                            <input type="color" value={activeShape.color} onChange={(e) => handleUpdateShape({ color: e.target.value })} className="absolute inset-0 opacity-0 cursor-pointer" aria-label={t("stickerColor")} />
+                          </label>
+                          <IconButton label={t("stickerDelete")} onClick={handleDeleteShape}><Trash2 size={16} /></IconButton>
+                          <button className="btn btn-ghost text-xs" onClick={() => updateFaceConfig("activeShapeIndex", null)}>{t("done")}</button>
+                        </div>
+                      </div>
+                      {[
+                        ["x", t("stickerX"), 0, 1024, 1],
+                        ["y", t("stickerY"), 0, 1024, 1],
+                        ["scale", t("stickerSize"), 0.1, 5, 0.1],
+                        ["rotation", t("stickerTurn"), 0, 360, 1],
+                      ].map(([key, label, min, max, step]) => (
+                        <label key={key} className="grid grid-cols-[4.5rem_1fr] items-center gap-2 text-xs text-muted">
+                          {label}
+                          <input type="range" min={min} max={max} step={step} value={activeShape[key]} onChange={(e) => handleUpdateShape({ [key]: parseFloat(e.target.value) })} className="mini w-full" />
+                        </label>
+                      ))}
+                    </div>
+                  ) : (
+                    face.shapes?.length > 0 && (
+                      <div className="flex gap-1.5 flex-wrap">
+                        {face.shapes.map((s, i) => (
+                          <button key={s.id} onClick={() => updateFaceConfig("activeShapeIndex", i)} className="btn btn-soft h-8 text-xs px-2.5">
+                            <span className="w-3 h-3 rounded-sm" style={{ background: s.color }} />
+                            {t(`sticker_${s.type}`)} {i + 1}
+                          </button>
+                        ))}
+                      </div>
+                    )
+                  )}
+                </div>
+              </>
+            )}
+          </section>
+        )}
+      </div>
+
+      {/* footer: account + keep / export */}
+      <div className="px-4 py-3 border-t border-line space-y-2.5">
+        {currentUser ? (
+          <div className="flex items-center gap-2">
+            <span className="w-8 h-8 rounded-full bg-mint/20 text-brand-ink grid place-items-center text-sm font-bold shrink-0">{currentUser.email?.charAt(0).toUpperCase()}</span>
+            <span className="flex-1 text-sm truncate text-muted">{currentUser.email}</span>
+            <IconButton label={t("logout")} onClick={logout}><LogOut size={16} /></IconButton>
+          </div>
+        ) : (
+          <button onClick={() => setShowAuthModal(true)} className="btn btn-ghost w-full text-brand-ink">
+            <LogIn size={17} />
+            {t("loginRegister")}
+          </button>
+        )}
+        <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
+          <button onClick={handleSaveBox} disabled={isSaving} className="btn btn-primary">
+            {isSaving ? <Loader2 size={17} className="animate-spin" /> : <Save size={17} />}
+            {isSaving ? t("saving") : t("saveBox")}
+          </button>
+          <button onClick={() => (currentUser ? setShowGalleryModal(true) : setShowAuthModal(true))} className="btn btn-soft">
+            <Images size={17} />
+            {t("myGallery")}
+          </button>
+          <button onClick={() => window.dispatchEvent(new CustomEvent("trigger-snapshot"))} className="btn btn-soft btn-icon" title={t("exportImage")} aria-label={t("exportImage")}>
+            <Download size={17} />
+          </button>
+        </div>
       </div>
     </aside>
   );

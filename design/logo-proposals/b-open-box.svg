@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Foldify">
+  <!-- B: an isometric box with its lid folding open -->
+  <path d="M10 30 L32 42 L32 62 L10 50 Z" fill="#28a1ab"/>
+  <path d="M32 42 L54 30 L54 50 L32 62 Z" fill="#00c8b5"/>
+  <path d="M10 30 L32 18 L54 30 L32 42 Z" fill="#0b5d66"/>
+  <path d="M32 18 L54 30 L46 8 L24 -2 Z" transform="translate(0 6)" fill="#00d5c9"/>
+  <path d="M32 24 L54 36" stroke="#06302f" stroke-width="1.4" stroke-linecap="round" opacity=".35"/>
+</svg>

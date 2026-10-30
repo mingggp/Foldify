@@ -1,0 +1,47 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+@font-face{font-family:BJ;font-weight:700;src:url(../../node_modules/@fontsource/bai-jamjuree/files/bai-jamjuree-latin-700-normal.woff2)}
+@font-face{font-family:BJT;font-weight:600;src:url(../../node_modules/@fontsource/bai-jamjuree/files/bai-jamjuree-thai-600-normal.woff2)}
+@font-face{font-family:AN;src:url(../../node_modules/@fontsource/anuphan/files/anuphan-thai-400-normal.woff2)}
+@font-face{font-family:ANL;src:url(../../node_modules/@fontsource/anuphan/files/anuphan-latin-400-normal.woff2)}
+body{margin:0;background:#e9f2f1;font-family:ANL,AN,sans-serif;color:#0e3238;padding:40px;width:1320px}
+h1{font:600 26px BJ,BJT,AN;margin:0 0 6px} p.sub{margin:0 0 28px;color:#557177;font-size:15px}
+.row{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
+.col{display:flex;flex-direction:column;gap:12px}
+.card{border-radius:24px;padding:26px;display:flex;align-items:center;gap:16px;min-height:120px}
+.light{background:#fff}.dark{background:#071a1e;color:#e2f3f1}
+.word{font:700 34px BJ;letter-spacing:-.5px}
+.mark{width:72px;height:72px}
+.icons{display:flex;gap:14px;align-items:end}
+.tile{border-radius:22%;display:grid;place-items:center;background:#fff;box-shadow:0 6px 18px -8px rgba(14,50,56,.35)}
+.tile.d{background:#0f2a30}
+h2{font:600 18px BJ,BJT,AN;margin:6px 0 0} .note{font-size:14px;color:#557177;line-height:1.5;margin:0}
+.lab{font:600 13px BJ;color:#177681}
+</style></head><body>
+<h1>Foldify · ไอเดียโลโก้</h1>
+<p class="sub">3 แนวทาง ใช้สีแบรนด์ #28a1ab · #00c8b5 · #00d5c9 คอลัมน์แรกคือโลโก้ปัจจุบันไว้เทียบ</p>
+<div class="row">
+ <div class="col"><span class="lab">ตอนนี้</span>
+  <div class="card light"><svg class="mark" viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="url(#g0)"/><defs><linearGradient id="g0" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#00d5c9"/><stop offset=".45" stop-color="#00c8b5"/><stop offset="1" stop-color="#28a1ab"/></linearGradient></defs><g transform="translate(4.5 4.5) scale(.625)" fill="none" stroke="#06302f" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" y1="22" x2="12" y2="12"/></g></svg><span class="word">Foldify</span></div>
+  <div class="card dark"><svg class="mark" viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="url(#g1)"/><defs><linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#00d5c9"/><stop offset=".45" stop-color="#00c8b5"/><stop offset="1" stop-color="#28a1ab"/></linearGradient></defs><g transform="translate(4.5 4.5) scale(.625)" fill="none" stroke="#06302f" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" y1="22" x2="12" y2="12"/></g></svg><span class="word">Foldify</span></div>
+  <h2>ลูกบาศก์เดิม</h2><p class="note">ไอคอนลูกบาศก์ทั่วไป เปลี่ยนเป็นสีเทียลแล้ว สื่อว่า "3 มิติ" แต่ยังไม่สื่อเรื่อง "การพับ"</p>
+ </div>
+ <div class="col"><span class="lab">A</span>
+  <div class="card light"><img class="mark" src="a-fold-cross.svg"><span class="word">Foldify</span></div>
+  <div class="card dark"><img class="mark" src="a-fold-cross.svg"><span class="word">Foldify</span></div>
+  <div class="icons"><div class="tile" style="width:64px;height:64px"><img src="a-fold-cross.svg" width="44"></div><div class="tile d" style="width:40px;height:40px"><img src="a-fold-cross.svg" width="28"></div><img src="a-fold-cross.svg" width="16"></div>
+  <h2>A · รูปคลี่กำลังพับ</h2><p class="note">รูปคลี่กากบาทที่แขนข้างหนึ่งกำลังยกขึ้น ตรงกับสิ่งที่แอปทำเป๊ะ ช่องกลางสีเข้มตรงกับ "ช่องที่จะเป็นด้านบน" ในตัวเลือกรูปคลี่</p>
+ </div>
+ <div class="col"><span class="lab">B</span>
+  <div class="card light"><img class="mark" src="b-open-box.svg"><span class="word">Foldify</span></div>
+  <div class="card dark"><img class="mark" src="b-open-box.svg"><span class="word">Foldify</span></div>
+  <div class="icons"><div class="tile" style="width:64px;height:64px"><img src="b-open-box.svg" width="44"></div><div class="tile d" style="width:40px;height:40px"><img src="b-open-box.svg" width="28"></div><img src="b-open-box.svg" width="16"></div>
+  <h2>B · กล่องเปิดฝา</h2><p class="note">ใกล้กับลูกบาศก์เดิมที่สุด เปลี่ยนแล้วคนยังจำได้ ฝาที่เปิดอยู่เพิ่มความรู้สึกเรื่องการพับ</p>
+ </div>
+ <div class="col"><span class="lab">C</span>
+  <div class="card light"><img class="mark" src="c-dog-ear.svg"><span class="word">Foldify</span></div>
+  <div class="card dark"><img class="mark" src="c-dog-ear.svg"><span class="word">Foldify</span></div>
+  <div class="icons"><div class="tile" style="width:64px;height:64px"><img src="c-dog-ear.svg" width="44"></div><div class="tile d" style="width:40px;height:40px"><img src="c-dog-ear.svg" width="28"></div><img src="c-dog-ear.svg" width="16"></div>
+  <h2>C · มุมกระดาษพับ</h2><p class="note">แผ่นกระดาษพับมุมกับตัว F อ่านง่ายสุดตอนย่อเล็ก (ไอคอนแท็บเบราว์เซอร์, สติกเกอร์ QR บนชีท)</p>
+ </div>
+</div>
+</body></html>

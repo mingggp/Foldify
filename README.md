@@ -66,6 +66,14 @@ The **Share / QR** button builds a link (and a downloadable QR code) for the net
 
 **Guess before folding**: asks "which face is opposite X?", folds the box to reveal the answer, keeps score; "New net" picks a random net and placement for self-practice. On a design without labels it practises on a lettered net and restores the design afterwards.
 
+## 🎨 Look and feel
+
+- Design tokens (colours, fonts, glass panels) live at the top of `src/index.css`. Brand teals: `#28a1ab`, `#00c8b5`, `#00d5c9`; amber `#ffb238` marks the selected face.
+- Fonts are bundled from npm (Anuphan for text, Bai Jamjuree for headings) — no font CDN, so it still works on school networks that block them.
+- Light / dark / auto theme in Settings (remembered per browser). Tools panel docks beside the 3D view from 1024 px wide (iPad landscape, PC) and slides in from the side on narrower screens.
+- The previous interface is kept on the `legacy/ui-v1` branch.
+- Logo ideas: `design/logo-proposals/board.png`.
+
 ## 🧪 Tests
 
 ```bash

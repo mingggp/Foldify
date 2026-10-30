@@ -1,10 +1,19 @@
 <!doctype html>
-<html lang="en">
+<html lang="th">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/cuboid-logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#28a1ab" />
+    <meta name="description" content="Foldify: fold cube nets into 3D boxes, step by step." />
     <title>Foldify</title>
+    <script>
+      // apply the saved / system theme before the first paint (no light flash in dark mode)
+      try {
+        var t = localStorage.getItem("foldify.theme") || "system";
+        if (t === "dark" || (t === "system" && matchMedia("(prefers-color-scheme: dark)").matches)) document.documentElement.classList.add("dark");
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

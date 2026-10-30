@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
-import { X, QrCode, Copy, Check, Download, RotateCw } from "lucide-react";
+import { QrCode, Copy, Check, Download, RotateCw } from "lucide-react";
+import Modal, { Toggle } from "../ui/Modal";
 import { useLang } from "../../contexts/LanguageContext";
 import { appBaseUrl, buildShareLink, facesToLabels, MAX_LABEL_LENGTH, paperOrder, splitGraphemes } from "../../lib/shareLink";
 
@@ -32,8 +33,8 @@ export function QrBlock({ link, fileName = "foldify-qr.png" }) {
 
   return (
     <div className="flex flex-col sm:flex-row gap-4 items-center">
-      <div className="w-40 h-40 shrink-0 rounded-xl bg-white border border-slate-200 dark:border-slate-700 flex items-center justify-center overflow-hidden">
-        {qrUrl ? <img src={qrUrl} alt="QR code" data-testid="share-qr" className="w-full h-full" /> : <QrCode className="text-slate-300" size={40} />}
+      <div className="w-40 h-40 shrink-0 rounded-2xl bg-white border border-line flex items-center justify-center overflow-hidden">
+        {qrUrl ? <img src={qrUrl} alt="QR code" data-testid="share-qr" className="w-full h-full anim-pop" key={qrUrl} /> : <QrCode className="text-muted" size={40} />}
       </div>
       <div className="flex-1 w-full space-y-2 min-w-0">
         <input
@@ -41,10 +42,10 @@ export function QrBlock({ link, fileName = "foldify-qr.png" }) {
           value={link}
           data-testid="share-link"
           onFocus={(e) => e.target.select()}
-          className="w-full text-xs font-mono px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700"
+          className="field text-xs"
         />
         <div className="flex gap-2">
-          <button onClick={copy} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white">
+          <button onClick={copy} className="btn btn-primary flex-1">
             {copied ? <Check size={16} /> : <Copy size={16} />}
             {copied ? t("shareCopied") : t("shareCopy")}
           </button>
@@ -52,7 +53,7 @@ export function QrBlock({ link, fileName = "foldify-qr.png" }) {
             href={qrUrl || undefined}
             download={fileName}
             aria-disabled={!qrUrl}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200"
+            className={`btn btn-soft flex-1 ${qrUrl ? "" : "pointer-events-none opacity-50"}`}
           >
             <Download size={16} />
             {t("shareDownloadQr")}
@@ -87,82 +88,53 @@ export default function ShareModal({ onClose, netIndex, transform, faceLabels, f
     quiz: startQuiz,
   });
 
-  const cell = 56;
+  const cell = 60;
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="share-title"
-        className="bg-white dark:bg-slate-900 w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-          <h2 id="share-title" className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-            <QrCode size={20} className="text-indigo-500" />
-            {t("shareTitle")}
-          </h2>
-          <button onClick={onClose} aria-label={t("quizClose")} className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 rounded-lg">
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-5">
-          <p className="text-xs text-slate-500 dark:text-slate-400">{t("shareHint")}</p>
-
-          {/* The net, square by square, as it appears on screen */}
-          <div className="flex justify-center">
-            <div className="relative" style={{ width: order.columns * cell, height: order.rows * cell }} data-testid="share-net">
-              {order.cells.map((c, i) => (
-                <div
-                  key={c.path}
-                  className="absolute border-2 border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 rounded-md flex items-center justify-center"
-                  style={{ left: c.x * cell, top: c.y * cell, width: cell - 4, height: cell - 4 }}
+    <Modal title={t("shareTitle")} subtitle={t("shareHint")} icon={QrCode} onClose={onClose} size="md" testId="share">
+      <div className="space-y-5">
+        {/* The net, square by square, as it appears on screen */}
+        <div className="flex justify-center rounded-2xl bg-surface-2 border border-line py-5">
+          <div className="relative" style={{ width: order.columns * cell, height: order.rows * cell }} data-testid="share-net">
+            {order.cells.map((c, i) => (
+              <div
+                key={c.path}
+                className="absolute border-2 border-line bg-surface rounded-lg flex items-center justify-center focus-within:border-mint transition-colors"
+                style={{ left: c.x * cell, top: c.y * cell, width: cell - 4, height: cell - 4 }}
+              >
+                <input
+                  value={labels[i]}
+                  aria-label={`${t("square")} ${i + 1}`}
+                  data-testid={`share-label-${i}`}
+                  onChange={(e) => setLabels((prev) => prev.map((l, j) => (j === i ? clampLabel(e.target.value) : l)))}
+                  className="w-full h-full text-center bg-transparent text-xl font-display font-bold focus:outline-none rounded-md transition-transform duration-300"
+                  style={{ transform: `rotate(${turns[i] * 90}deg)` }}
+                />
+                <button
+                  type="button"
+                  title={t("shareTurn")}
+                  aria-label={`${t("shareTurn")} (${i + 1})`}
+                  data-testid={`share-turn-${i}`}
+                  onClick={() => setTurns((prev) => prev.map((v, j) => (j === i ? (v + 1) % 4 : v)))}
+                  className="absolute -top-2 -right-2 w-6 h-6 grid place-items-center rounded-full bg-surface border border-line text-muted hover:text-brand-ink hover:border-mint shadow-sm"
                 >
-                  <input
-                    value={labels[i]}
-                    aria-label={`square ${i + 1}`}
-                    data-testid={`share-label-${i}`}
-                    onChange={(e) => setLabels((prev) => prev.map((l, j) => (j === i ? clampLabel(e.target.value) : l)))}
-                    className="w-full h-full text-center bg-transparent text-lg font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-md transition-transform"
-                    style={{ transform: `rotate(${turns[i] * 90}deg)` }}
-                  />
-                  <button
-                    type="button"
-                    title={t("shareTurn")}
-                    aria-label={`${t("shareTurn")} (${i + 1})`}
-                    data-testid={`share-turn-${i}`}
-                    onClick={() => setTurns((prev) => prev.map((v, j) => (j === i ? (v + 1) % 4 : v)))}
-                    className="absolute -top-1.5 -right-1.5 p-0.5 rounded-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-500 hover:text-indigo-600"
-                  >
-                    <RotateCw size={10} />
-                  </button>
-                </div>
-              ))}
-            </div>
+                  <RotateCw size={12} />
+                </button>
+              </div>
+            ))}
           </div>
-
-          <div className="flex flex-wrap gap-4 text-sm text-slate-700 dark:text-slate-300">
-            <label className="flex items-center gap-2">
-              <input type="checkbox" checked={startFolded} onChange={(e) => setStartFolded(e.target.checked)} className="accent-indigo-600" />
-              {t("shareStartFolded")}
-            </label>
-            <label className="flex items-center gap-2">
-              <input type="checkbox" checked={startQuiz} onChange={(e) => setStartQuiz(e.target.checked)} className="accent-indigo-600" data-testid="share-quiz" />
-              {t("shareStartQuiz")}
-            </label>
-          </div>
-
-          <QrBlock link={link} fileName={`foldify-net${netIndex + 1}.png`} />
-
-          <button
-            onClick={() => onApply(labels, turns)}
-            className="w-full py-2 rounded-lg text-sm font-medium border border-indigo-300 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30"
-          >
-            {t("shareApply")}
-          </button>
         </div>
+
+        <div className="grid sm:grid-cols-2 gap-x-6">
+          <Toggle label={t("shareStartFolded")} checked={startFolded} onChange={setStartFolded} />
+          <Toggle label={t("shareStartQuiz")} checked={startQuiz} onChange={setStartQuiz} testId="share-quiz" />
+        </div>
+
+        <QrBlock link={link} fileName={`foldify-net${netIndex + 1}.png`} />
+
+        <button onClick={() => onApply(labels, turns)} className="btn btn-soft w-full">
+          {t("shareApply")}
+        </button>
       </div>
-    </div>
+    </Modal>
   );
 }
