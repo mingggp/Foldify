@@ -13,6 +13,7 @@ import SettingsModal from './components/SettingsModal';
 import { useHistory } from './hooks/useHistory';
 import ShareModal from './components/share/ShareModal';
 import QuizPanel from './components/quiz/QuizPanel';
+import ShapeEditor from './components/editor/ShapeEditor';
 import { parseShareLink, labelsToFaces } from './lib/shareLink';
 import { makeLabelTexture } from './lib/labelTexture';
 import { makeOppositeQuestion, randomPracticeNet } from './lib/quiz';
@@ -93,6 +94,7 @@ function AppContent() {
   // Labels typed in the Share dialog / read from a link: { faceId: { label, turn } }
   const [faceLabels, setFaceLabels] = useState(initialFaceLabels);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showShapeEditor, setShowShapeEditor] = useState(false);
   const toast = useToast();
   // Labels still on their faces (a face loses its label once its picture is replaced);
   // the turn follows the face's current rotation.
@@ -273,6 +275,7 @@ function AppContent() {
         foldProgress={foldProgress}
         setFoldProgress={setFoldByHand}
         onPlayFold={playFold}
+        onOpenShapeEditor={() => { setSelectedFace((f) => f || "front"); setShowShapeEditor(true); }}
         onOpenShare={() => setShowShareModal(true)}
         onStartQuiz={startQuiz}
         isQuizOpen={!!quiz}
@@ -359,6 +362,19 @@ function AppContent() {
             applyLabels(activeNetId, netTransform, labels, turns);
             setShowShareModal(false);
           }}
+        />
+      )}
+      {showShapeEditor && selectedFace && (
+        <ShapeEditor
+          faceId={selectedFace}
+          facesConfig={facesConfig}
+          setFacesConfig={setFacesConfig}
+          onPickFace={setSelectedFace}
+          onClose={() => setShowShapeEditor(false)}
+          undo={undoFaces}
+          redo={redoFaces}
+          canUndo={canUndo}
+          canRedo={canRedo}
         />
       )}
       <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />

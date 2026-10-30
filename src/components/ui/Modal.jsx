@@ -10,6 +10,7 @@ export default function Modal({ title, icon: Icon, subtitle, onClose, children, 
   const { t } = useLang();
   const ref = useRef(null);
   const closeRef = useRef(onClose);
+  const downOnBackdrop = useRef(false);
   useEffect(() => { closeRef.current = onClose; }, [onClose]);
 
   // runs once per opening: focus in, Esc to close, focus back out
@@ -27,7 +28,13 @@ export default function Modal({ title, icon: Icon, subtitle, onClose, children, 
   const width = { sm: "max-w-sm", md: "max-w-xl", lg: "max-w-4xl", xl: "max-w-5xl" }[size];
 
   return (
-    <div className={`fixed inset-0 ${z} flex items-center justify-center p-4 bg-[#03161a]/45 backdrop-blur-[3px] anim-fade`} onClick={onClose}>
+    <div
+      className={`fixed inset-0 ${z} flex items-center justify-center p-4 bg-[#03161a]/45 backdrop-blur-[3px] anim-fade`}
+      // close only when the press both starts and ends on the backdrop (a drag that slips
+      // off the dialog, e.g. while drawing, must not close it)
+      onPointerDown={(e) => { downOnBackdrop.current = e.target === e.currentTarget; }}
+      onClick={(e) => { if (downOnBackdrop.current && e.target === e.currentTarget) onClose?.(); downOnBackdrop.current = false; }}
+    >
       <div
         ref={ref}
         role="dialog"
@@ -35,7 +42,6 @@ export default function Modal({ title, icon: Icon, subtitle, onClose, children, 
         aria-label={typeof title === "string" ? title : undefined}
         tabIndex={-1}
         data-testid={testId}
-        onClick={(e) => e.stopPropagation()}
         className={`w-full ${width} max-h-[90dvh] flex flex-col rounded-3xl bg-surface text-ink border border-line shadow-2xl anim-rise outline-none`}
       >
         <header className="flex items-start gap-3 px-6 pt-5 pb-4">

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { Edges } from "@react-three/drei";
 import { VALID_CUBE_NETS } from "./netsConfig";
+import { drawShapes } from "../../lib/shapes";
 import { hingeFor, mapEdge, normalizeTransform, resolveFaceIds, rootPlacement } from "../../lib/netGeometry";
 
 // Paint one face (colour, picture, stickers, selection outline) into its canvas texture.
@@ -16,32 +17,7 @@ function paintFace(faceCanvas, texture, { color, imgObj, shapes, rotation, flipX
     ctx.drawImage(imgObj, 0, 0, 1024, 1024);
   }
 
-  if (shapes && shapes.length > 0) {
-    shapes.forEach(shape => {
-      ctx.save();
-      ctx.translate(shape.x, shape.y);
-      ctx.rotate(shape.rotation * (Math.PI / 180));
-      ctx.scale(shape.scale, shape.scale);
-      
-      ctx.fillStyle = shape.color;
-      ctx.beginPath();
-      
-      if (shape.type === 'square') {
-        ctx.rect(-50, -50, 100, 100);
-      } else if (shape.type === 'circle') {
-        ctx.arc(0, 0, 50, 0, Math.PI * 2);
-      } else if (shape.type === 'star') {
-        for (let i = 0; i < 5; i++) {
-          ctx.lineTo(Math.cos((18 + i * 72) * Math.PI / 180) * 50, -Math.sin((18 + i * 72) * Math.PI / 180) * 50);
-          ctx.lineTo(Math.cos((54 + i * 72) * Math.PI / 180) * 20, -Math.sin((54 + i * 72) * Math.PI / 180) * 20);
-        }
-        ctx.closePath();
-      }
-      
-      ctx.fill();
-      ctx.restore();
-    });
-  }
+  drawShapes(ctx, shapes);
 
   if (isSelected) {
     ctx.lineWidth = 40; // Super thick visible border
