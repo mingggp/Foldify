@@ -3,7 +3,7 @@ import { installProbe, setAllFaceTextures, settle } from './helpers.js'
 
 test.use({ viewport: { width: 1280, height: 800 } })
 
-const ready = (page) => page.waitForFunction(() => window.__foldify?.three && window.__foldify?.state, null, { timeout: 30_000 })
+const ready = (page) => page.waitForFunction(() => window.__foldify?.three && window.__foldify?.state, null, { timeout: 60_000 })
 const state = (page) => page.evaluate(() => {
   const s = window.__foldify.state
   return {
@@ -72,6 +72,7 @@ test('Share dialog: type labels, get a link + QR that reopens the same box', asy
   await page.getByRole('button', { name: /Use these labels|ใช้ตัวอักษรนี้/ }).click()
   const applied = await state(page)
 
+  await page.close() // one software-WebGL page at a time is plenty for a CI runner
   const other = await context.newPage()
   await other.goto(link)
   await ready(other)
