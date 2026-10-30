@@ -1,4 +1,4 @@
-import { Cuboid, PaintBucket, Download, Settings, X, SlidersHorizontal, ImagePlus, Trash2, FlipHorizontal, FlipVertical, RotateCcw, RotateCw, Moon, Sun, Grid3x3, LightbulbOff, Lightbulb, Square, Circle, Star, Trash, Wand2, Loader2, AlertCircle, Save, LogOut, LogIn, Image as ImageIcon, ChevronDown, ChevronRight } from "lucide-react";
+import { Cuboid, PaintBucket, Download, Settings, X, SlidersHorizontal, ImagePlus, Trash2, FlipHorizontal, FlipVertical, RotateCcw, RotateCw, Moon, Sun, Grid3x3, LightbulbOff, Lightbulb, Square, Circle, Star, Trash, Loader2, Save, LogOut, LogIn, Image as ImageIcon, ChevronDown, ChevronRight } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import NetSelector from "../NetSelector";
 import { useAuth } from "../../contexts/AuthContext";
@@ -7,26 +7,8 @@ import { useLang } from "../../contexts/LanguageContext";
 import { analyzeNetImage } from "../../utils/SmartNetAnalyzer";
 import { useToast } from "../../contexts/ToastContext";
 
-// Friendly messages for the AI image endpoint
-function aiErrorMessage(status, info = {}) {
-  if (status === 429) {
-    const wait = info.retryAfter > 90 ? `${Math.ceil(info.retryAfter / 60)} นาที` : `${info.retryAfter || 60} วินาที`;
-    return info.scope === 'global-day'
-      ? 'วันนี้มีคนใช้ AI ครบโควต้าแล้ว ลองใหม่พรุ่งนี้นะ'
-      : `ใช้ AI ถี่ไปนิด รออีก ${wait} แล้วลองใหม่นะ`;
-  }
-  if (info.error === 'prompt_too_long') return `คำอธิบายยาวเกินไป (ไม่เกิน ${info.max} ตัวอักษร)`;
-  if (info.error === 'ai_not_configured') return 'ยังไม่ได้ตั้งค่า HF_TOKEN บนเซิร์ฟเวอร์';
-  if (info.error === 'model_loading') return 'โมเดลกำลังโหลด ลองใหม่อีกครั้งในไม่กี่วินาที';
-  if (status === 504) return 'AI ตอบช้าเกินไป ลองใหม่อีกครั้งนะ';
-  return `สร้างรูปไม่สำเร็จ (${status})`;
-}
-
 export default function Sidebar({ closeSidebar, facesConfig, setFacesConfig, undoFaces, redoFaces, canUndo, canRedo, selectedFace, setSelectedFace, activeNetId, setActiveNetId, netFlipX, setNetFlipX, netFlipY, setNetFlipY, netRotation = 0, setNetRotation, onExport, setShowAuthModal, setShowGalleryModal, setShowSettingsModal }) {
 
-  const [aiPrompt, setAiPrompt] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [aiError, setAiError] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [clipboardFaceConfig, setClipboardFaceConfig] = useState(null);
   const [isSetupOpen, setIsSetupOpen] = useState(false);
@@ -168,47 +150,6 @@ export default function Sidebar({ closeSidebar, facesConfig, setFacesConfig, und
   };
 
   const handleColorChange = (e) => updateFaceConfig('color', e.target.value);
-
-  const handleGenerateAITexture = async () => {
-    if (!aiPrompt.trim()) {
-      setAiError("Please enter a prompt first.");
-      return;
-    }
-
-    setIsGenerating(true);
-    setAiError(null);
-
-    try {
-      // The Hugging Face token now lives on the server (api/generate-image.js).
-      const response = await fetch("/api/generate-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: aiPrompt }),
-      });
-
-      if (!response.ok) {
-        let info = {};
-        try {
-          info = await response.json();
-        } catch {
-          // not JSON
-        }
-        throw new Error(aiErrorMessage(response.status, info));
-      }
-
-      const blob = await response.blob();
-      const imageUrl = URL.createObjectURL(blob);
-
-      updateFaceConfig('textureUrl', imageUrl);
-      setAiPrompt("");
-
-    } catch (err) {
-      console.error(err);
-      setAiError(err.message);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
 
   const handleImageUpload = (e) => {
     const file = e.target.files?.[0];
@@ -589,45 +530,6 @@ export default function Sidebar({ closeSidebar, facesConfig, setFacesConfig, und
                 )}
               </div>
 
-              {/* AI Generator */}
-              <div className="space-y-2 pt-3 border-t border-slate-200 dark:border-slate-700">
-                <label className="text-xs font-medium text-slate-600 dark:text-slate-400">{t('aiGenerator')}</label>
-                <textarea
-                  value={aiPrompt}
-                  onChange={e => setAiPrompt(e.target.value)}
-                  placeholder={t('aiPlaceholder')}
-                  className="w-full h-16 resize-none bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 text-xs text-slate-700 dark:text-slate-300 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  disabled={isGenerating}
-                />
-
-                {aiError && (
-                  <div className="flex items-center gap-1.5 text-red-500 text-[10px] bg-red-50 dark:bg-red-900/20 p-1.5 rounded border border-red-100 dark:border-red-900/50 mt-1">
-                    <AlertCircle size={12} className="flex-shrink-0" />
-                    <span className="leading-tight">{aiError}</span>
-                  </div>
-                )}
-
-                <button
-                  onClick={handleGenerateAITexture}
-                  disabled={isGenerating || !aiPrompt.trim()}
-                  className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-colors mt-2 ${isGenerating || !aiPrompt.trim()
-                    ? 'bg-indigo-100 text-indigo-400 dark:bg-indigo-900/30 dark:text-indigo-400/50 cursor-not-allowed'
-                    : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm'
-                    }`}
-                >
-                  {isGenerating ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      {t('aiLoading')}
-                    </>
-                  ) : (
-                    <>
-                      <Wand2 size={16} />
-                      {t('aiGenerateBtn')}
-                    </>
-                  )}
-                </button>
-              </div>
 
             </div>
           )}

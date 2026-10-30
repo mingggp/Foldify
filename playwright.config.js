@@ -10,7 +10,6 @@ const fakeFirebase = {
   VITE_FIREBASE_STORAGE_BUCKET: 'fake-project.appspot.com',
   VITE_FIREBASE_MESSAGING_SENDER_ID: '000000000000',
   VITE_FIREBASE_APP_ID: '1:000000000000:web:fake',
-  HF_TOKEN: '',
 }
 
 export default defineConfig({

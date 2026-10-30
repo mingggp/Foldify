@@ -27,8 +27,8 @@ export default defineConfig([
     },
   },
   {
-    // Node code: Vercel functions, tooling and tests
-    files: ['api/**/*.js', 'tests/**/*.js', '*.config.js'],
+    // Node code: tooling and tests
+    files: ['tests/**/*.js', '*.config.js'],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
 ])
