@@ -91,7 +91,12 @@ export function paperOrder(netIndex, transform) {
 export function parseShareLink(search) {
   const p = new URLSearchParams(search);
   const box = p.get("box");
-  if (box && /^[A-Za-z0-9_-]{1,64}$/.test(box)) return { version: clampInt(p.get("v"), 1, 99, 1), box };
+  if (box && /^[A-Za-z0-9_-]{1,64}$/.test(box)) {
+    const out = { version: clampInt(p.get("v"), 1, 99, 1), box };
+    if (p.has("fold")) out.fold = clampInt(p.get("fold"), 0, 100, 0) / 100;
+    if (p.get("quiz") === "1") out.quiz = true;
+    return out;
+  }
   if (!p.has("net") && !p.has("labels")) return null;
   return {
     version: clampInt(p.get("v"), 1, 99, 1),
@@ -119,6 +124,8 @@ export function buildShareLink(base, { netIndex = 0, transform = {}, labels, tur
   const parts = [`v=${LINK_VERSION}`];
   if (box) {
     parts.push(`box=${encodeURIComponent(box)}`);
+    if (fold > 0) parts.push(`fold=${Math.round(fold * 100)}`);
+    if (quiz) parts.push("quiz=1");
   } else {
     const t = canonicalTransform(transform);
     parts.push(`net=${netIndex + 1}`);

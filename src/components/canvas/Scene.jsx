@@ -31,7 +31,7 @@ function ExportRenderer() {
   const { gl, scene, camera } = useThree();
   useEffect(() => {
     const onRender = (e) => {
-      const { id, width, height, zoom = 1, view = "current", grid = false, shadow = true, background = "transparent" } = e.detail || {};
+      const { id, width, height, zoom = 1, view = "current", grid = false, shadow = true, background = "transparent", target = null } = e.detail || {};
       const cam = camera.clone();
       if (view === "iso") {
         cam.position.copy(TARGET).addScaledVector(HOME_DIR, 13.5);
@@ -43,12 +43,14 @@ function ExportRenderer() {
       cam.updateProjectionMatrix();
       cam.updateMatrixWorld(true);
 
-      const hidden = [];
+      // set visibility for the export, remember what to put back
+      const changed = [];
       scene.traverse((o) => {
-        const hide =
-          o.name === "selection-glow" || o.name === "highlight-edge" ||
-          (o.name === "floor-grid" && !grid) || (o.name === "floor-shadow" && !shadow);
-        if (hide && o.visible) { o.visible = false; hidden.push(o); }
+        let want = o.visible;
+        if (o.name === "selection-glow" || o.name === "highlight-edge") want = false;
+        else if (o.name === "floor-grid") want = grid;
+        else if (o.name === "floor-shadow") want = shadow && o.visible;
+        if (want !== o.visible) { changed.push([o, o.visible]); o.visible = want; }
       });
       const prevSize = gl.getSize(new THREE.Vector2());
       const prevRatio = gl.getPixelRatio();
@@ -61,9 +63,16 @@ function ExportRenderer() {
         gl.setClearColor(0xffffff, background === "white" ? 1 : 0);
         gl.clear();
         gl.render(scene, cam);
-        url = gl.domElement.toDataURL("image/png");
+        if (target) {
+          // live preview: copy straight into the given canvas (no PNG encoding — fast)
+          const ctx = target.getContext("2d");
+          ctx.clearRect(0, 0, target.width, target.height);
+          ctx.drawImage(gl.domElement, 0, 0, width, height, 0, 0, target.width, target.height);
+        } else {
+          url = gl.domElement.toDataURL("image/png");
+        }
       } finally {
-        hidden.forEach((o) => { o.visible = true; });
+        changed.forEach(([o, v]) => { o.visible = v; });
         gl.setPixelRatio(prevRatio);
         gl.setSize(prevSize.x, prevSize.y, false);
         gl.setClearColor(prevClear, prevAlpha);
@@ -209,9 +218,11 @@ export default function Scene({ children, theme, showGrid, showShadows, isAutoRo
         {children}
 
         {/* Floor and Grid */}
-        {showGrid && (
+        {/* always mounted (hidden when off) so a picture export can still include it */}
+        {(
           <Grid
             name="floor-grid"
+            visible={showGrid}
             infiniteGrid
             fadeDistance={40}
             sectionThickness={1.2}

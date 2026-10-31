@@ -43,34 +43,46 @@ test('picking a face does not repaint face textures (fast taps)', async ({ page 
   expect(glow).toBe(1)
 })
 
-test('export: preview is the saved picture, without the selection outline', async ({ page }) => {
+test('export: live preview, wheel zoom, grid even when the app grid is off; saved PNG has no selection', async ({ page }) => {
   await page.goto('/')
   await ready(page)
-  await page.evaluate(() => { const f = window.__foldify; f.setFoldProgress(1); f.setSelectedFace('front') })
+  await page.evaluate(() => { const f = window.__foldify; f.setFoldProgress(1); f.setSelectedFace('front'); f.setShowGrid(false) })
   await page.getByTestId('open-export').click()
   const preview = page.getByTestId('export-preview')
-  await expect(preview).toBeVisible({ timeout: 60_000 })
-  const first = await preview.getAttribute('src')
-  // the scene still has its selection outline, but the export hid it while rendering
-  expect(await page.evaluate(() => { let v = null; window.__foldify.three.scene.traverse((o) => { if (o.name === 'selection-glow') v = o.visible }); return v })).toBe(true)
-  // white background, square, 2048 px
-  const info = await page.evaluate(async (src) => {
-    const img = new Image(); img.src = src; await img.decode()
+  await expect(preview).toBeVisible()
+  // 'ink' = drawn, non-white pixels (a fresh canvas is transparent, which doesn't count)
+  const snap = () => preview.evaluate((c) => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let ink = 0; for (let i = 0; i < d.length; i += 16) { if (d[i + 3] === 255 && (d[i] < 245 || d[i + 1] < 245 || d[i + 2] < 245)) ink++ } return { ink, w: c.width } })
+  await expect.poll(async () => (await snap()).ink, { timeout: 60_000 }).toBeGreaterThan(1000)
+  const before = (await snap()).ink
+
+  // wheel over the picture zooms in: the box covers more of the picture
+  await preview.hover()
+  await page.mouse.wheel(0, -600)
+  await expect.poll(async () => (await snap()).ink, { timeout: 60_000 }).toBeGreaterThan(before * 1.3)
+
+  // grid on, although the grid is switched off in the app
+  const zoomed = (await snap()).ink
+  await page.getByTestId('export-grid').check()
+  await expect.poll(async () => (await snap()).ink, { timeout: 60_000 }).toBeGreaterThan(zoomed + 2000) // thin grid lines appear around the box
+  await page.getByTestId('export-grid').uncheck()
+
+  // the saved picture: 2048 px, white corners, no amber selection outline; selection stays on screen
+  const [download] = await Promise.all([page.waitForEvent('download', { timeout: 120_000 }), page.getByTestId('export-save').click()])
+  const b64 = (await (await import('node:fs/promises')).readFile(await download.path())).toString('base64')
+  const info = await page.evaluate(async (b64) => {
+    const img = new Image(); img.src = 'data:image/png;base64,' + b64; await img.decode()
     const c = document.createElement('canvas'); c.width = img.width; c.height = img.height
     const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0)
-    const corner = ctx.getImageData(4, 4, 1, 1).data
-    // any amber selection-outline pixels? (#ffb238)
     const d = ctx.getImageData(0, 0, c.width, c.height).data
     let amber = 0
     for (let i = 0; i < d.length; i += 4 * 7) if (d[i] > 240 && d[i + 1] > 160 && d[i + 1] < 200 && d[i + 2] < 90) amber++
-    return { w: img.width, h: img.height, corner: [...corner], amber }
-  }, first)
+    return { w: img.width, h: img.height, corner: [...ctx.getImageData(4, 4, 1, 1).data], amber }
+  }, b64)
   expect([info.w, info.h]).toEqual([2048, 2048])
   expect(info.corner).toEqual([255, 255, 255, 255])
   expect(info.amber).toBe(0)
-  // turning the grid on makes a new picture
-  await page.getByTestId('export-grid').check()
-  await expect(preview).not.toHaveAttribute('src', first, { timeout: 60_000 })
+  expect(await page.evaluate(() => { let v = null; window.__foldify.three.scene.traverse((o) => { if (o.name === 'selection-glow') v = o.visible }); return v })).toBe(true)
+  expect(await page.evaluate(() => { let v = null; window.__foldify.three.scene.traverse((o) => { if (o.name === 'floor-grid') v = o.visible }); return v })).toBe(false)
 })
 
 test('scan help pops up with the how-to', async ({ page }) => {
@@ -81,4 +93,29 @@ test('scan help pops up with the how-to', async ({ page }) => {
   await expect(page.getByTestId('scan-help-pop')).toContainText(/Press Scan|กดปุ่มสแกน/)
   await page.mouse.move(900, 600)
   await expect(page.getByTestId('scan-help-pop')).toHaveCount(0)
+})
+
+test('face letters sit in the middle of the face', async ({ page }) => {
+  await page.goto('/')
+  await ready(page)
+  const off = await page.evaluate(async () => {
+    const { makeLabelTexture } = await import('/src/lib/labelTexture.js')
+    const out = {}
+    for (const label of ['A', 'F', 'g', 'กิ', 'ป', '12']) {
+      const img = new Image(); img.src = makeLabelTexture(label); await img.decode()
+      const c = document.createElement('canvas'); c.width = c.height = 512
+      const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0)
+      const d = ctx.getImageData(0, 0, 512, 512).data
+      let minX = 512, maxX = 0, minY = 512, maxY = 0
+      for (let y = 0; y < 512; y++) for (let x = 0; x < 512; x++) {
+        if (d[(y * 512 + x) * 4] < 128) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y) }
+      }
+      out[label] = [(minX + maxX) / 2 - 256, (minY + maxY) / 2 - 256]
+    }
+    return out
+  })
+  for (const [label, [dx, dy]] of Object.entries(off)) {
+    expect(Math.abs(dx), `${label} x`).toBeLessThan(6)
+    expect(Math.abs(dy), `${label} y`).toBeLessThan(6)
+  }
 })

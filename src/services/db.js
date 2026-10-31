@@ -24,7 +24,7 @@ const compressTextureUrl = (url) => {
 
 export const saveBoxConfig = async (userId, payload) => {
   try {
-    const { facesConfig, activeNetId, netFlipX, netFlipY, netRotation = 0 } = payload;
+    const { facesConfig, activeNetId, netFlipX, netFlipY, netRotation = 0, visibility = "private", title } = payload;
     
     // Create a copy of config so we don't mutate the UI state unpredictably
     const configToSave = JSON.parse(JSON.stringify(facesConfig));
@@ -51,8 +51,8 @@ export const saveBoxConfig = async (userId, payload) => {
       schemaVersion: 2,
       // Must be the server time — firestore.rules rejects client-supplied dates
       createdAt: serverTimestamp(),
-      visibility: "private",
-      title: `Box Config ${new Date().toLocaleDateString()}`
+      visibility,
+      title: title || `Box Config ${new Date().toLocaleDateString()}`
     });
 
     return docRef.id;

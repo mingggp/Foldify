@@ -38,6 +38,8 @@ test('simple link stays short and readable', () => {
 test('box links', () => {
   expect(buildShareLink(BASE, { box: 'abc123' })).toBe(`${BASE}?v=1&box=abc123`)
   expect(parseShareLink('?v=1&box=abc123')).toEqual({ version: 1, box: 'abc123' })
+  expect(buildShareLink(BASE, { box: 'abc123', fold: 1, quiz: true })).toBe(`${BASE}?v=1&box=abc123&fold=100&quiz=1`)
+  expect(parseShareLink('?v=1&box=abc123&fold=100&quiz=1')).toEqual({ version: 1, box: 'abc123', fold: 1, quiz: true })
   expect(parseShareLink('?box=../../x')).toBe(null)
 })
 
