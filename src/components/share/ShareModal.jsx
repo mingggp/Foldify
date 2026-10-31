@@ -141,14 +141,15 @@ export default function ShareModal({ onClose, netIndex, transform, faceLabels, f
         <div className="rounded-2xl bg-white border border-line p-3">
           <NetPreview facesConfig={facesConfig} netIndex={netIndex} transform={transform} />
         </div>
-        <div className="grid sm:grid-cols-2 gap-x-6">
-          <Toggle label={t("shareStartFolded")} checked={startFolded} onChange={setStartFolded} />
-          <Toggle label={t("shareStartQuiz")} checked={startQuiz} onChange={setStartQuiz} testId="share-quiz" />
+        {/* two switches, with a thin line between them */}
+        <div className="grid sm:grid-cols-2 rounded-2xl border border-line divide-y sm:divide-y-0 sm:divide-x divide-line" data-testid="share-options">
+          <div className="px-4"><Toggle label={t("shareStartFolded")} checked={startFolded} onChange={setStartFolded} /></div>
+          <div className="px-4"><Toggle label={t("shareStartQuiz")} checked={startQuiz} onChange={setStartQuiz} testId="share-quiz" /></div>
         </div>
         {link ? (
           <>
             <QrBlock link={link} fileName={`foldify-net${netIndex + 1}.png`} />
-            <p className="hint">{labelOnly ? t("shareBoxLetters") : t("shareBoxSaved")}</p>
+            {labelOnly && <p className="hint">{t("shareBoxLetters")}</p>}
           </>
         ) : !currentUser ? (
           <div className="rounded-2xl border border-dashed border-line p-4 space-y-3 text-center">
