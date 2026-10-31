@@ -36,6 +36,26 @@ function facesFromLabels(faceLabels, base = {}) {
 const initialLink = typeof window !== "undefined" ? parseShareLink(window.location.search) : null;
 const initialNet = initialLink && !initialLink.box ? initialLink : null;
 const initialFaceLabels = initialNet ? labelsToFaces(initialNet.netIndex, initialNet.transform, initialNet.labels, initialNet.turns) : {};
+/** localStorage can be blocked (private mode, school devices) — never let that break the app */
+function readPref(key, fallback) {
+  try { return localStorage.getItem(key) || fallback; } catch { return fallback; }
+}
+function writePref(key, value) {
+  try { localStorage.setItem(key, value); } catch { /* ignore */ }
+}
+const darkQuery = typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+function useSystemDark() {
+  const query = darkQuery;
+  const [dark, setDark] = useState(() => !!query?.matches);
+  useEffect(() => {
+    if (!query) return;
+    const onChange = (e) => setDark(e.matches);
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, [query]);
+  return dark;
+}
+
 const hasLabels = (fl) => Object.values(fl || {}).filter((l) => l?.label).length >= 2;
 
 
@@ -43,8 +63,10 @@ function AppContent() {
   const { lang, setLang, t } = useLang();
   
   const [foldProgress, setFoldProgress] = useState(initialNet ? initialNet.fold : 0); // 0 to 1
-  const [selectedFace, setSelectedFace] = useState(initialNet ? null : "front");
-  const [theme, setTheme] = useState("dark");
+  const [selectedFace, setSelectedFace] = useState(null);
+  const [theme, setTheme] = useState(() => readPref("foldify.theme", "system")); // "system" | "light" | "dark"
+  const systemDark = useSystemDark();
+  const resolvedTheme = theme === "system" ? (systemDark ? "dark" : "light") : theme;
   const [showGrid, setShowGrid] = useState(true);
   const [showShadows, setShowShadows] = useState(true);
   const [showLabels, setShowLabels] = useState(false);
@@ -57,7 +79,7 @@ function AppContent() {
   const [isAutoRotate, setIsAutoRotate] = useState(false);
   
   // Settings & Navigation States
-  const [sidebarPosition, setSidebarPosition] = useState("left"); // "left" | "right"
+  const [sidebarPosition, setSidebarPosition] = useState(() => readPref("foldify.panel", "left")); // "left" | "right"
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   
   // Phase 8 States
@@ -106,6 +128,23 @@ function AppContent() {
     foldAnim.current = requestAnimationFrame(step);
   }, []);
   const setFoldByHand = useCallback((v) => { cancelAnimationFrame(foldAnim.current); setFoldProgress(v); }, []);
+  const playFold = useCallback(() => animateFold(foldRef.current < 0.5 ? 1 : 0, 1500), [animateFold]);
+
+  // Opening moment: fold the net up once and open it again, so the idea is clear at a glance.
+  // Skipped for links (they ask for a specific state), reduced motion and automated tests.
+  useEffect(() => {
+    if (initialNet || initialLink?.box || navigator.webdriver) return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const timers = [setTimeout(() => animateFold(1, 1300), 450), setTimeout(() => animateFold(0, 1100), 2300)];
+    return () => timers.forEach(clearTimeout);
+  }, [animateFold]);
+
+  // theme -> <html class="dark">, remembered between visits
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", resolvedTheme === "dark");
+    writePref("foldify.theme", theme);
+  }, [theme, resolvedTheme]);
+  useEffect(() => { writePref("foldify.panel", sidebarPosition); }, [sidebarPosition]);
 
   // ---- labels on squares ----
   const applyLabels = useCallback((netIndex, transform, labels, turns) => {
@@ -231,8 +270,9 @@ function AppContent() {
   return (
     <>
       <MainLayout 
-        foldProgress={foldProgress} 
+        foldProgress={foldProgress}
         setFoldProgress={setFoldByHand}
+        onPlayFold={playFold}
         onOpenShare={() => setShowShareModal(true)}
         onStartQuiz={startQuiz}
         isQuizOpen={!!quiz}
@@ -272,7 +312,7 @@ function AppContent() {
             setNetFlipX={setNetFlipX}
             setNetFlipY={setNetFlipY}
             setNetRotation={setNetRotation}
-            theme={theme}
+            theme={resolvedTheme}
             showGrid={showGrid}
             showShadows={showShadows}
             isAutoRotate={isAutoRotate}

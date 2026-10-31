@@ -1,60 +1,71 @@
 @import "tailwindcss";
 
-@layer utilities {
-  /* hide scrollbar for clean UI */
-  .scrollbar-hide::-webkit-scrollbar {
-      display: none;
-  }
-  .scrollbar-hide {
-      -ms-overflow-style: none;
-      scrollbar-width: none;
-  }
+/* Dark mode follows the app setting (class on <html>), not only the OS. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ------------------------------------------------------------------
+   Design tokens
+   Brand teals: #28a1ab · #00c8b5 · #00d5c9  (from Ming's brand sheet)
+   "spark" is used only for the selected face and the quiz question.
+   ------------------------------------------------------------------ */
+:root {
+  --paper: #e9f2f1;
+  --surface: #ffffff;
+  --surface-2: #f2f8f7;
+  --ink: #0e3238;
+  --muted: #557177;
+  --line: #cfe0df;
+  --brand: #28a1ab;
+  --brand-ink: #177681;      /* teal text on light backgrounds (AA) */
+  --mint: #00c8b5;
+  --aqua: #00d5c9;
+  --spark: #ffb238;
+  --good: #0f9d6b;
+  --bad: #d64545;
+  --glass: rgb(255 255 255 / 0.72);
+  --glass-line: rgb(255 255 255 / 0.9);
+  --shadow: 0 1px 2px rgb(14 50 56 / 0.06), 0 12px 32px -8px rgb(14 50 56 / 0.18);
+  --stage: radial-gradient(1200px 700px at 12% -10%, rgb(0 213 201 / 0.22), transparent 60%),
+           radial-gradient(900px 600px at 110% 110%, rgb(40 161 171 / 0.20), transparent 60%),
+           #e3eeed;
+  color-scheme: light;
 }
 
-@keyframes gradient-xy {
-  0%, 100% {
-    background-size: 400% 400%;
-    background-position: left center;
-  }
-  50% {
-    background-size: 200% 200%;
-    background-position: right center;
-  }
+.dark {
+  --paper: #071a1e;
+  --surface: #0f2a30;
+  --surface-2: #133339;
+  --ink: #e2f3f1;
+  --muted: #8db0b2;
+  --line: #1e4248;
+  --brand-ink: #4fd3cf;
+  --good: #34d399;
+  --bad: #f87171;
+  --glass: rgb(15 42 48 / 0.72);
+  --glass-line: rgb(120 220 215 / 0.12);
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 16px 40px -12px rgb(0 0 0 / 0.6);
+  --stage: radial-gradient(1200px 700px at 12% -10%, rgb(0 213 201 / 0.16), transparent 60%),
+           radial-gradient(900px 600px at 110% 110%, rgb(40 161 171 / 0.18), transparent 60%),
+           #06161a;
+  color-scheme: dark;
 }
 
-.animate-gradient-xy {
-  animation: gradient-xy 3s ease infinite;
-}
-
-@keyframes shimmer {
-  100% {
-    transform: translateX(100%);
-  }
-}
-
-.shimmer-effect {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(
-    to right,
-    transparent 0%,
-    rgba(99, 102, 241, 0.15) 50%,
-    transparent 100%
-  );
-  transform: translateX(-100%);
-  animation: shimmer 2.5s infinite;
-}
-
-.dark .shimmer-effect {
-  background: linear-gradient(
-    to right,
-    transparent 0%,
-    rgba(255, 255, 255, 0.4) 50%,
-    transparent 100%
-  );
+@theme inline {
+  --font-sans: "Anuphan", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Bai Jamjuree", "Anuphan", ui-sans-serif, sans-serif;
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-mint: var(--mint);
+  --color-aqua: var(--aqua);
+  --color-spark: var(--spark);
+  --color-good: var(--good);
+  --color-bad: var(--bad);
 }
 
 html, body, #root {
@@ -64,26 +75,181 @@ html, body, #root {
   padding: 0;
   overflow: hidden;          /* prevent page scroll on iPad/mobile */
   touch-action: none;        /* hand all touch events to JS, no browser scroll */
-  background-color: #f3f4f6; /* bg-gray-100 */
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Custom Slider Thumb Styles to improve touch/click target size */
-input[type=range]::-webkit-slider-thumb {
+/* inputs, scroll areas and dialogs still need normal touch behaviour */
+input, textarea, select, .scroll-area { touch-action: auto; }
+
+:focus-visible {
+  outline: 2px solid var(--mint);
+  outline-offset: 2px;
+}
+
+@layer components {
+  .glass {
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(20px) saturate(1.5);
+    backdrop-filter: blur(20px) saturate(1.5);
+    border: 1px solid var(--glass-line);
+    box-shadow: var(--shadow);
+  }
+
+  .stage-bg { background: var(--stage); }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 2.5rem;
+    padding: 0 0.9rem;
+    border-radius: 0.75rem;
+    font-weight: 600;
+    font-size: 0.875rem;
+    line-height: 1;
+    white-space: nowrap;
+    transition: background-color 0.15s, color 0.15s, box-shadow 0.15s, transform 0.1s;
+    cursor: pointer;
+  }
+  .btn:active:not(:disabled) { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* bright mint with ink text: the brand colours stay legible (white on teal would not) */
+  .btn-primary {
+    background: linear-gradient(135deg, var(--aqua), var(--mint));
+    color: #06302f;
+    box-shadow: 0 6px 16px -6px rgb(0 200 181 / 0.6), inset 0 1px 0 rgb(255 255 255 / 0.5);
+  }
+  .btn-primary:hover:not(:disabled) { box-shadow: 0 8px 22px -6px rgb(0 200 181 / 0.75), inset 0 1px 0 rgb(255 255 255 / 0.5); }
+
+  .btn-soft {
+    background: var(--surface-2);
+    color: var(--ink);
+    border: 1px solid var(--line);
+  }
+  .btn-soft:hover:not(:disabled) { border-color: var(--brand); }
+
+  .btn-ghost { color: var(--muted); }
+  .btn-ghost:hover:not(:disabled) { color: var(--ink); background: var(--surface-2); }
+
+  .btn-icon {
+    min-height: 2.5rem;
+    min-width: 2.5rem;
+    padding: 0;
+  }
+
+  .btn-on {
+    background: color-mix(in oklab, var(--mint) 18%, transparent);
+    color: var(--brand-ink);
+    border-color: color-mix(in oklab, var(--mint) 55%, transparent);
+  }
+
+  .field {
+    width: 100%;
+    min-height: 2.5rem;
+    padding: 0 0.75rem;
+    border-radius: 0.75rem;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    font-size: 0.875rem;
+  }
+  .field:focus { outline: none; border-color: var(--mint); box-shadow: 0 0 0 3px color-mix(in oklab, var(--mint) 25%, transparent); }
+
+  .section-title {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--ink);
+  }
+
+  .hint { font-size: 0.75rem; line-height: 1.5; color: var(--muted); }
+}
+
+/* ---------- Fold slider ---------- */
+.fold-range {
   -webkit-appearance: none;
-  width: 22px;
-  height: 22px;
-  background: #4f46e5;
-  border-radius: 50%;
+  appearance: none;
+  width: 100%;
+  height: 2.75rem;
+  background: transparent;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  --p: 0%;
+}
+.fold-range::-webkit-slider-runnable-track {
+  height: 0.5rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--brand), var(--mint) var(--p), var(--line) var(--p));
+}
+.fold-range::-moz-range-track {
+  height: 0.5rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--brand), var(--mint) var(--p), var(--line) var(--p));
+}
+.fold-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-top: -0.625rem;
+  border-radius: 0.5rem;
+  background: var(--surface);
+  border: 3px solid var(--mint);
+  box-shadow: 0 4px 10px -2px rgb(0 120 110 / 0.45);
+  transform: rotate(calc(var(--p-num, 0) * 45deg));
+}
+.fold-range::-moz-range-thumb {
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 0.5rem;
+  background: var(--surface);
+  border: 3px solid var(--mint);
+  box-shadow: 0 4px 10px -2px rgb(0 120 110 / 0.45);
 }
 
-input[type=range]::-moz-range-thumb {
-  width: 22px;
-  height: 22px;
-  background: #4f46e5;
-  border-radius: 50%;
-  cursor: pointer;
-  border: none;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+/* small ordinary sliders */
+input[type=range].mini {
+  accent-color: var(--mint);
+  height: 1.5rem;
 }
+
+/* ---------- motion ---------- */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@keyframes sheet-left { from { transform: translateX(-24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes sheet-right { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes scanline {
+  0%, 100% { top: 18%; }
+  50% { top: 82%; }
+}
+@keyframes toast-in { from { opacity: 0; transform: translateY(-12px) scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes toast-out { to { opacity: 0; transform: translateY(-8px) scale(0.96); } }
+
+.anim-rise { animation: rise 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.anim-fade { animation: fade 0.2s ease-out both; }
+.anim-pop { animation: pop 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.anim-sheet-left { animation: sheet-left 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.anim-sheet-right { animation: sheet-right 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* hide scrollbar for clean UI */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }

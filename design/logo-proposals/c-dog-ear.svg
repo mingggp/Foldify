@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Foldify">
+  <!-- C: a sheet with its corner folded over, carrying an F -->
+  <defs>
+    <linearGradient id="c-sheet" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#00d5c9"/>
+      <stop offset=".55" stop-color="#00c8b5"/>
+      <stop offset="1" stop-color="#28a1ab"/>
+    </linearGradient>
+  </defs>
+  <path d="M14 2 H44 L62 20 V50 Q62 62 50 62 H14 Q2 62 2 50 V14 Q2 2 14 2 Z" fill="url(#c-sheet)"/>
+  <path d="M44 2 V14 Q44 20 50 20 H62 Z" fill="#b8f3ee"/>
+  <path d="M44 2 L62 20 H50 Q44 20 44 14 Z" fill="#06302f" opacity=".12" transform="translate(-1.5 1.5)"/>
+  <path d="M20 16 H38 V24 H29 V30 H36 V38 H29 V50 H20 Z" fill="#ffffff"/>
+</svg>

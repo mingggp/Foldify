@@ -25,6 +25,7 @@ export default function CustomCameraControls({
   rollSensitivity = 1.0,
   isAutoRotate = false,
   autoRotateSpeed = 2.0,
+  home = [4, 11.5, 7.5],
 }) {
   const { camera, gl } = useThree();
   const targetV = useRef(new THREE.Vector3(...target));
@@ -35,13 +36,15 @@ export default function CustomCameraControls({
     distance: 10,
   });
 
-  // Initialise from camera's real starting position
+  // Start from the "home" view. (Reading camera.position here is not reliable: R3F may not
+  // have applied the <Canvas camera> position yet, which left the old app looking at the
+  // net from the side at table height.)
   useEffect(() => {
     const s = state.current;
-    s.dir.copy(camera.position).sub(targetV.current);
+    s.dir.set(...home).sub(targetV.current);
     s.distance = s.dir.length();
     s.dir.normalize();
-    s.up.copy(camera.up).normalize();
+    s.up.set(0, 1, 0);
   }, []); // eslint-disable-line
 
   useEffect(() => {
@@ -190,7 +193,7 @@ export default function CustomCameraControls({
 
     // ─── Reset camera ────────────────────────────────────────────────────────
     const onReset = () => {
-      const initial = new THREE.Vector3(8, 6, 9).sub(targetV.current);
+      const initial = new THREE.Vector3(...home).sub(targetV.current);
       s.distance = initial.length();
       s.dir.copy(initial).normalize();
       s.up.set(0, 1, 0);
@@ -231,9 +234,11 @@ export default function CustomCameraControls({
     if (s.dir.length() < 0.5) s.dir.set(0, 0, 1);
     s.dir.normalize();
     s.up.normalize();
+    // portrait screens (iPad upright) see less sideways: step back so the net still fits
+    const fit = camera.aspect < 1 ? Math.pow(1 / camera.aspect, 0.8) : 1;
     camera.position
       .copy(targetV.current)
-      .addScaledVector(s.dir, s.distance);
+      .addScaledVector(s.dir, s.distance * fit);
     camera.up.copy(s.up);
     camera.lookAt(targetV.current);
   });

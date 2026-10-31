@@ -45,7 +45,7 @@ function paintFace(faceCanvas, texture, { color, imgObj, shapes, rotation, flipX
 
   if (isSelected) {
     ctx.lineWidth = 40; // Super thick visible border
-    ctx.strokeStyle = '#ec4899'; // Vivid Pink (Pink 500)
+    ctx.strokeStyle = '#ffb238'; // spark (selected face)
     ctx.strokeRect(20, 20, 984, 984); // Inset slightly so thick lines stay inside UV
   }
 
@@ -109,9 +109,9 @@ function FaceMaterial({ config, showShadows, isHovered, isSelected }) {
   const Material = showShadows ? "meshStandardMaterial" : "meshBasicMaterial";
 
   // Use a noticeable emissive color for selected (e.g. Vivid Pink glow), and subtle for hovered
-  const emissiveColor = isSelected ? "#831843" : isHovered ? "#333333" : "#000000";
+  const emissiveColor = isSelected ? "#3d2600" : isHovered ? "#0d3330" : "#000000";
   // For unlit mode (BasicMaterial), we change the base color tint directly
-  const basicColor = isSelected ? "#fbcfe8" : isHovered ? "#e2e8f0" : "#ffffff";
+  const basicColor = isSelected ? "#ffe6b8" : isHovered ? "#d9f6f2" : "#ffffff";
 
   const hoverProps = showShadows ? { emissive: emissiveColor } : { color: basicColor };
 
@@ -185,7 +185,7 @@ function FaceNode({ node, path, edge, angle, transform, faceIds, facesConfig, ge
     <Edges
       name="highlight-edge"
       scale={isSelected ? 1.02 : 1.01}
-      color={isSelected ? "#ec4899" : "#a5b4fc"}
+      color={isSelected ? "#ffb238" : "#00c8b5"}
       threshold={15}
     />
   );

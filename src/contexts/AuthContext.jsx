@@ -9,6 +9,8 @@ import {
 
 const AuthContext = createContext();
 
+// the hook lives next to its provider on purpose
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   return useContext(AuthContext);
 }

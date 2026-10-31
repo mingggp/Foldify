@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
-import { X, Mail, Lock, Loader2, AlertCircle } from "lucide-react";
+import { useLang } from "../../contexts/LanguageContext";
+import { Mail, Lock, Loader2, AlertCircle, UserRound } from "lucide-react";
+import Modal from "../ui/Modal";
 
 export default function AuthModal({ isOpen, onClose }) {
   const [isLogin, setIsLogin] = useState(true);
@@ -9,128 +11,65 @@ export default function AuthModal({ isOpen, onClose }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { login, register } = useAuth();
+  const { t } = useLang();
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    
-    if (!email || !password) {
-      setError("Please fill in all fields.");
-      return;
-    }
-
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
-      return;
-    }
-
+    if (!email || !password) return setError(t("authFillAll"));
+    if (password.length < 6) return setError(t("authShortPassword"));
     try {
       setLoading(true);
-      if (isLogin) {
-        await login(email, password);
-      } else {
-        await register(email, password);
-      }
-      onClose(); // Automatically close on success
+      if (isLogin) await login(email, password);
+      else await register(email, password);
+      onClose();
     } catch (err) {
       console.error(err);
-      if (err.code === "auth/email-already-in-use") {
-        setError("This email is already registered.");
-      } else if (err.code === "auth/invalid-credential") {
-        setError("Invalid email or password.");
-      } else {
-        setError("Failed to authenticate. " + err.message);
-      }
+      if (err.code === "auth/email-already-in-use") setError(t("authEmailUsed"));
+      else if (err.code === "auth/invalid-credential") setError(t("authWrong"));
+      else setError(`${t("authFailed")} (${err.code || err.message})`);
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden relative animate-in fade-in zoom-in duration-200">
-        
-        <button 
-          onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-md transition-colors"
-        >
-          <X size={18} />
-        </button>
-
-        <div className="p-8">
-          <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-1">
-            {isLogin ? "Welcome Back" : "Create Account"}
-          </h2>
-          <p className="text-sm text-slate-500 mb-6">
-            {isLogin ? "Sign in to save and access your 3D geometry creations." : "Join to save your creations to the cloud."}
-          </p>
-
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800/50 rounded-lg flex items-start gap-2 text-red-600 dark:text-red-400 text-sm">
-              <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Email</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail size={16} className="text-slate-400" />
-                </div>
-                <input 
-                  type="email" 
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="you@example.com"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Password</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock size={16} className="text-slate-400" />
-                </div>
-                <input 
-                  type="password" 
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="••••••••"
-                />
-              </div>
-            </div>
-
-            <button 
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium text-sm transition-colors mt-2 flex justify-center items-center gap-2"
-            >
-              {loading ? (
-                <><Loader2 size={16} className="animate-spin" /> {isLogin ? "Signing in..." : "Creating account..."}</>
-              ) : (
-                isLogin ? "Sign In" : "Sign Up"
-              )}
-            </button>
-          </form>
-
-          <div className="mt-6 text-center text-sm text-slate-500">
-            {isLogin ? "Don't have an account?" : "Already have an account?"}
-            <button 
-              onClick={() => { setIsLogin(!isLogin); setError(""); }} 
-              className="ml-1 text-indigo-600 dark:text-indigo-400 font-semibold hover:underline"
-            >
-              {isLogin ? "Sign up" : "Sign in"}
-            </button>
-          </div>
-        </div>
-      </div>
+  const field = (Icon, props) => (
+    <div className="relative">
+      <Icon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+      <input {...props} className="field pl-9 h-11" />
     </div>
+  );
+
+  return (
+    <Modal title={isLogin ? t("authSignInTitle") : t("authSignUpTitle")} subtitle={t("authWhy")} icon={UserRound} onClose={onClose} size="sm" testId="auth">
+      {error && (
+        <div role="alert" className="mb-4 p-3 rounded-xl bg-bad/10 text-bad text-sm flex items-start gap-2">
+          <AlertCircle size={16} className="mt-0.5 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <label className="block space-y-1.5">
+          <span className="text-sm font-medium">{t("email")}</span>
+          {field(Mail, { type: "email", autoComplete: "email", value: email, onChange: (e) => setEmail(e.target.value), placeholder: "you@example.com" })}
+        </label>
+        <label className="block space-y-1.5">
+          <span className="text-sm font-medium">{t("password")}</span>
+          {field(Lock, { type: "password", autoComplete: isLogin ? "current-password" : "new-password", value: password, onChange: (e) => setPassword(e.target.value), placeholder: "••••••••" })}
+        </label>
+        <button type="submit" disabled={loading} className="btn btn-primary w-full h-11 mt-2">
+          {loading && <Loader2 size={16} className="animate-spin" />}
+          {isLogin ? t("signIn") : t("signUp")}
+        </button>
+      </form>
+      <p className="mt-5 text-center text-sm text-muted">
+        {isLogin ? t("authNoAccount") : t("authHaveAccount")}
+        <button onClick={() => { setIsLogin(!isLogin); setError(""); }} className="ml-1.5 font-semibold text-brand-ink hover:underline">
+          {isLogin ? t("signUp") : t("signIn")}
+        </button>
+      </p>
+    </Modal>
   );
 }
