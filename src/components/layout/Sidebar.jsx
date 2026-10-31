@@ -5,6 +5,7 @@ import Logo from "../ui/Logo";
 import ScanHelp from "./ScanHelp";
 import { Segmented, Range } from "../ui/Modal";
 import { useAuth } from "../../contexts/AuthContext";
+import { MAX_LABEL_LENGTH, splitGraphemes } from "../../lib/shareLink";
 import { saveBoxConfig } from "../../services/db";
 import { useLang } from "../../contexts/LanguageContext";
 import { analyzeNetImage } from "../../utils/SmartNetAnalyzer";
@@ -21,7 +22,7 @@ function IconButton({ label, children, ...rest }) {
   );
 }
 
-export default function Sidebar({ closeSidebar, quizOpen, onOpenShapeEditor, facesConfig, setFacesConfig, undoFaces, redoFaces, canUndo, canRedo, selectedFace, setSelectedFace, activeNetId, setActiveNetId, netFlipX, setNetFlipX, netFlipY, setNetFlipY, netRotation = 0, setNetRotation, setShowAuthModal, setShowGalleryModal, setShowSettingsModal, setShowExportModal }) {
+export default function Sidebar({ closeSidebar, quizOpen, onOpenShapeEditor, faceLabels = {}, onSetLabel, facesConfig, setFacesConfig, undoFaces, redoFaces, canUndo, canRedo, selectedFace, setSelectedFace, activeNetId, setActiveNetId, netFlipX, setNetFlipX, netFlipY, setNetFlipY, netRotation = 0, setNetRotation, setShowAuthModal, setShowGalleryModal, setShowSettingsModal, setShowExportModal }) {
   const [isSaving, setIsSaving] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [clipboardFaceConfig, setClipboardFaceConfig] = useState(null);
@@ -251,6 +252,20 @@ export default function Sidebar({ closeSidebar, quizOpen, onOpenShapeEditor, fac
                       <input type="color" value={face.color} onChange={(e) => updateFaceConfig("color", e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer" aria-label={t("customColor")} />
                     </label>
                   </div>
+                </div>
+
+                {/* letter */}
+                <div className="space-y-2">
+                  <h3 className="section-title">{t("letter")}</h3>
+                  <input
+                    value={faceLabels[selectedFace]?.label || ""}
+                    onChange={(e) => onSetLabel?.(selectedFace, splitGraphemes(e.target.value.normalize("NFC")).slice(0, MAX_LABEL_LENGTH).join(""))}
+                    placeholder={t("letterPlaceholder")}
+                    aria-label={t("letter")}
+                    data-testid="face-letter"
+                    className="field h-12 text-center text-xl font-display font-bold"
+                  />
+                  {face.textureUrl && !faceLabels[selectedFace] && <p className="hint">{t("letterReplaces")}</p>}
                 </div>
 
                 {/* picture */}

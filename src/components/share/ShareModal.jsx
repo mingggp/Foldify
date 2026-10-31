@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
-import { QrCode, Copy, Check, Download, RotateCw, Loader2 } from "lucide-react";
-import Modal, { Toggle, Segmented } from "../ui/Modal";
+import { QrCode, Copy, Check, Download, Loader2 } from "lucide-react";
+import Modal, { Toggle } from "../ui/Modal";
 import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
 import { saveBoxConfig } from "../../services/db";
 import { drawNet, faceImages } from "../../lib/cubeQuiz";
 import { drawShapes } from "../../lib/shapes";
 import { useLang } from "../../contexts/LanguageContext";
-import { appBaseUrl, buildShareLink, facesToLabels, MAX_LABEL_LENGTH, paperOrder, splitGraphemes } from "../../lib/shareLink";
+import { appBaseUrl, buildShareLink, facesToLabels } from "../../lib/shareLink";
 
 /** Link + QR code with copy / download buttons. */
 export function QrBlock({ link, fileName = "foldify-qr.png" }) {
@@ -69,8 +69,6 @@ export function QrBlock({ link, fileName = "foldify-qr.png" }) {
   );
 }
 
-const clampLabel = (v) => splitGraphemes(v.normalize("NFC")).slice(0, MAX_LABEL_LENGTH).join("");
-
 // Links made for a box in this session, so re-opening Share doesn't save a copy again.
 const sharedBoxes = new Map(); // JSON of the design -> box id
 
@@ -95,20 +93,15 @@ function NetPreview({ facesConfig, netIndex, transform }) {
 }
 
 /**
- * Share dialog.
- *  - "This box": the box as it is now. A box of letters only becomes a plain link; a box with
- *    pictures, colours or shapes is saved as a public copy (needs sign-in) and shared by id.
- *  - "Worksheet letters": type a label on each square for a worksheet QR code.
+ * Share the box as it is now.
+ *  - Letters only (typed in Decorate): the link carries the letters itself, no sign-in.
+ *  - Pictures, colours or shapes: a copy is saved as a public box (sign-in) and shared by id.
  */
-export default function ShareModal({ onClose, netIndex, transform, faceLabels, foldProgress, onApply, facesConfig, labelOnly, onSignIn }) {
+export default function ShareModal({ onClose, netIndex, transform, faceLabels, foldProgress, facesConfig, labelOnly, onSignIn }) {
   const { t } = useLang();
   const toast = useToast();
   const { currentUser } = useAuth();
-  const [tab, setTab] = useState("box");
-  const order = useMemo(() => paperOrder(netIndex, transform), [netIndex, transform]);
-  const initial = useMemo(() => facesToLabels(netIndex, transform, faceLabels), [netIndex, transform, faceLabels]);
-  const [labels, setLabels] = useState(initial.labels);
-  const [turns, setTurns] = useState(initial.turns);
+  const letters = useMemo(() => facesToLabels(netIndex, transform, faceLabels), [netIndex, transform, faceLabels]);
   const [startFolded, setStartFolded] = useState(foldProgress > 0.5);
   const [startQuiz, setStartQuiz] = useState(false);
   const designKey = useMemo(() => JSON.stringify({ facesConfig, netIndex, transform }), [facesConfig, netIndex, transform]);
@@ -116,9 +109,8 @@ export default function ShareModal({ onClose, netIndex, transform, faceLabels, f
   const [saving, setSaving] = useState(false);
 
   const fold = startFolded ? 1 : 0;
-  const link = buildShareLink(appBaseUrl(), { netIndex, transform, labels, turns, fold, quiz: startQuiz });
-  const boxLink = labelOnly
-    ? buildShareLink(appBaseUrl(), { netIndex, transform, labels: initial.labels, turns: initial.turns, fold, quiz: startQuiz })
+  const link = labelOnly
+    ? buildShareLink(appBaseUrl(), { netIndex, transform, labels: letters.labels, turns: letters.turns, fold, quiz: startQuiz })
     : boxId && buildShareLink(appBaseUrl(), { box: boxId, fold, quiz: startQuiz });
 
   const shareBox = async () => {
@@ -143,100 +135,34 @@ export default function ShareModal({ onClose, netIndex, transform, faceLabels, f
     }
   };
 
-  const toggles = (
-    <div className="grid sm:grid-cols-2 gap-x-6">
-      <Toggle label={t("shareStartFolded")} checked={startFolded} onChange={setStartFolded} />
-      <Toggle label={t("shareStartQuiz")} checked={startQuiz} onChange={setStartQuiz} testId="share-quiz" />
-    </div>
-  );
-
-  const cell = 60;
   return (
-    <Modal title={t("shareTitle")} icon={QrCode} onClose={onClose} size="md" testId="share">
+    <Modal title={t("shareTitle")} subtitle={t("shareSubtitle")} icon={QrCode} onClose={onClose} size="md" testId="share">
       <div className="space-y-5">
-        <Segmented
-          full
-          size="md"
-          value={tab}
-          onChange={setTab}
-          label={t("shareTitle")}
-          options={[
-            { value: "box", label: t("shareTabBox") },
-            { value: "labels", label: t("shareTabLabels") },
-          ]}
-        />
-
-        {tab === "box" && (
-          <div className="space-y-5 anim-rise" key="box">
-            <div className="rounded-2xl bg-white border border-line p-3">
-              <NetPreview facesConfig={facesConfig} netIndex={netIndex} transform={transform} />
-            </div>
-            {toggles}
-            {boxLink ? (
-              <>
-                <QrBlock link={boxLink} fileName={`foldify-box-net${netIndex + 1}.png`} />
-                <p className="hint">{labelOnly ? t("shareBoxLetters") : t("shareBoxSaved")}</p>
-              </>
-            ) : !currentUser ? (
-              <div className="rounded-2xl border border-dashed border-line p-4 space-y-3 text-center">
-                <p className="text-sm">{t("shareNeedsSignIn")}</p>
-                <button className="btn btn-primary" onClick={onSignIn} data-testid="share-signin">{t("loginRegister")}</button>
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-dashed border-line p-4 space-y-3 text-center">
-                <p className="text-sm">{t("shareMakeLinkHint")}</p>
-                <button className="btn btn-primary" onClick={shareBox} disabled={saving} data-testid="share-make-box-link">
-                  {saving && <Loader2 size={16} className="animate-spin" />}
-                  {t("shareMakeLink")}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {tab === "labels" && (
-        <div className="space-y-5 anim-rise" key="labels">
-        <p className="hint">{t("shareHint")}</p>
-        {/* The net, square by square, as it appears on screen */}
-        <div className="flex justify-center rounded-2xl bg-surface-2 border border-line py-5">
-          <div className="relative" style={{ width: order.columns * cell, height: order.rows * cell }} data-testid="share-net">
-            {order.cells.map((c, i) => (
-              <div
-                key={c.path}
-                className="absolute border-2 border-line bg-surface rounded-lg flex items-center justify-center focus-within:border-mint transition-colors"
-                style={{ left: c.x * cell, top: c.y * cell, width: cell - 4, height: cell - 4 }}
-              >
-                <input
-                  value={labels[i]}
-                  aria-label={`${t("square")} ${i + 1}`}
-                  data-testid={`share-label-${i}`}
-                  onChange={(e) => setLabels((prev) => prev.map((l, j) => (j === i ? clampLabel(e.target.value) : l)))}
-                  className="w-full h-full text-center bg-transparent text-xl font-display font-bold focus:outline-none rounded-md transition-transform duration-300"
-                  style={{ transform: `rotate(${turns[i] * 90}deg)` }}
-                />
-                <button
-                  type="button"
-                  title={t("shareTurn")}
-                  aria-label={`${t("shareTurn")} (${i + 1})`}
-                  data-testid={`share-turn-${i}`}
-                  onClick={() => setTurns((prev) => prev.map((v, j) => (j === i ? (v + 1) % 4 : v)))}
-                  className="absolute -top-2 -right-2 w-6 h-6 grid place-items-center rounded-full bg-surface border border-line text-muted hover:text-brand-ink hover:border-mint shadow-sm"
-                >
-                  <RotateCw size={12} />
-                </button>
-              </div>
-            ))}
-          </div>
+        <div className="rounded-2xl bg-white border border-line p-3">
+          <NetPreview facesConfig={facesConfig} netIndex={netIndex} transform={transform} />
         </div>
-
-        {toggles}
-
-        <QrBlock link={link} fileName={`foldify-net${netIndex + 1}.png`} />
-
-        <button onClick={() => onApply(labels, turns)} className="btn btn-soft w-full">
-          {t("shareApply")}
-        </button>
+        <div className="grid sm:grid-cols-2 gap-x-6">
+          <Toggle label={t("shareStartFolded")} checked={startFolded} onChange={setStartFolded} />
+          <Toggle label={t("shareStartQuiz")} checked={startQuiz} onChange={setStartQuiz} testId="share-quiz" />
         </div>
+        {link ? (
+          <>
+            <QrBlock link={link} fileName={`foldify-net${netIndex + 1}.png`} />
+            <p className="hint">{labelOnly ? t("shareBoxLetters") : t("shareBoxSaved")}</p>
+          </>
+        ) : !currentUser ? (
+          <div className="rounded-2xl border border-dashed border-line p-4 space-y-3 text-center">
+            <p className="text-sm">{t("shareNeedsSignIn")}</p>
+            <button className="btn btn-primary" onClick={onSignIn} data-testid="share-signin">{t("loginRegister")}</button>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-line p-4 space-y-3 text-center">
+            <p className="text-sm">{t("shareMakeLinkHint")}</p>
+            <button className="btn btn-primary" onClick={shareBox} disabled={saving} data-testid="share-make-box-link">
+              {saving && <Loader2 size={16} className="animate-spin" />}
+              {t("shareMakeLink")}
+            </button>
+          </div>
         )}
       </div>
     </Modal>

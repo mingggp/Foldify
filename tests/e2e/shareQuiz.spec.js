@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures.js'
 import { installProbe, setAllFaceTextures, settle } from './helpers.js'
 
 test.use({ viewport: { width: 1280, height: 800 } })
@@ -50,35 +50,41 @@ test('face "turn" rotates the picture clockwise as seen from outside', async ({ 
   }
 })
 
-test('Share dialog: type labels, get a link + QR that reopens the same box', async ({ page, context }) => {
+test('letters typed in Decorate are shared as a link that reopens the same box', async ({ page, context }) => {
   test.slow() // two pages with software WebGL on CI
   await page.goto('/')
   await ready(page)
   await page.evaluate(() => { window.__foldify.setActiveNetId(2); window.__foldify.setNetTransform({ rotation: 1 }) })
   await page.waitForFunction(() => window.__foldify.state.activeNetId === 2 && window.__foldify.state.netRotation === 1)
+  await page.getByRole('radio', { name: 'Decorate' }).click()
+  const letters = { top: 'ก', front: 'ข', left: 'ค', right: 'ง', back: 'จ', bottom: 'ฉ' }
+  for (const [face, letter] of Object.entries(letters)) {
+    await page.getByTestId(`face-chip-${face}`).click()
+    await page.getByTestId('face-letter').fill(letter)
+  }
+  // turn the letter on the bottom face once
+  await page.getByRole('button', { name: 'Turn right' }).click()
+  await page.waitForFunction(() => window.__foldify.state.facesConfig.bottom.rotation === 90)
+  const want = await state(page)
+  expect(Object.fromEntries(Object.entries(want.faceLabels).map(([k, v]) => [k, v.label]))).toEqual(letters)
+
   await page.getByTestId('open-share').click()
-  await page.getByRole('radio', { name: 'Worksheet letters' }).click()
-  const letters = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ']
-  for (let i = 0; i < 6; i++) await page.getByTestId(`share-label-${i}`).fill(letters[i])
-  await page.getByTestId('share-turn-2').click()
   await page.getByTestId('share-quiz').check()
   await expect(page.getByTestId('share-qr')).toBeVisible()
   const link = await page.getByTestId('share-link').inputValue()
   expect(link).toContain('v=1')
   expect(link).toContain('net=3')
   expect(link).toContain('rot=1')
-  expect(link).toContain('turn=001000')
+  expect(link).toMatch(/turn=[01]*1[01]*/)
   expect(link).toContain('quiz=1')
-
-  await page.getByRole('button', { name: /Use these labels|ใช้ตัวอักษรนี้/ }).click()
-  const applied = await state(page)
 
   await page.close() // one software-WebGL page at a time is plenty for a CI runner
   const other = await context.newPage()
   await other.goto(link)
   await ready(other)
   const opened = await state(other)
-  expect(opened.faceLabels).toEqual(applied.faceLabels)
+  expect(Object.fromEntries(Object.entries(opened.faceLabels).map(([k, v]) => [k, v.label]))).toEqual(letters)
+  expect(opened.rotations).toEqual(want.rotations)
   expect([opened.net, opened.rot]).toEqual([2, 1])
   await expect(other.getByTestId('quiz')).toBeVisible() // opened straight into guess mode
 })
@@ -104,4 +110,14 @@ test('Share "this box": a box with colours or pictures asks to sign in (saved co
   await expect(page.getByTestId('share-link')).toHaveCount(0)
   await page.getByTestId('share-signin').click()
   await expect(page.getByTestId('auth')).toBeVisible()
+})
+
+test('the app starts in Thai', async ({ browser }) => {
+  const ctx = await browser.newContext() // no English fixture here
+  const page = await ctx.newPage()
+  await page.goto('/')
+  await ready(page)
+  await expect(page.getByTestId('open-quiz')).toContainText('ทายก่อนพับ')
+  await expect(page.locator('html')).toHaveAttribute('lang', 'th')
+  await ctx.close()
 })

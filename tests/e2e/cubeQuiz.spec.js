@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures.js'
 import { installProbe, setAllFaceTextures, settle } from './helpers.js'
 
 test.use({ viewport: { width: 1280, height: 900 } })

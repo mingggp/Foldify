@@ -227,8 +227,8 @@ export default function Scene({ children, theme, showGrid, showShadows, isAutoRo
             fadeDistance={40}
             sectionThickness={1.2}
             cellThickness={0.8}
-            sectionColor={theme === 'dark' ? "#30383b" : "#8fc3c2"}
-            cellColor={theme === 'dark' ? "#1d2225" : "#c3dedd"}
+            sectionColor={theme === 'dark' ? "#1d5a5b" : "#8fc3c2"}
+            cellColor={theme === 'dark' ? "#11312f" : "#c3dedd"}
             position={[0, -0.02, 0]}
           />
         )}

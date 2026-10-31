@@ -162,6 +162,17 @@ function AppContent() {
     return map;
   }, [setFacesConfig]);
 
+  // a letter typed on one face in Decorate (drawn as the face's picture; turns with the picture)
+  const setFaceLabel = useCallback((faceId, label) => {
+    setFacesConfig((prev) => ({ ...prev, [faceId]: { ...prev[faceId], textureUrl: label ? makeLabelTexture(label) : null } }));
+    setFaceLabels((prev) => {
+      const next = { ...prev };
+      if (label) next[faceId] = { label, turn: 0 };
+      else delete next[faceId];
+      return next;
+    });
+  }, [setFacesConfig]);
+
   // ---- guess before folding (exam-style question made from the current box) ----
   const [showQuiz, setShowQuiz] = useState(() => !!(initialNet?.quiz && hasLabels(initialFaceLabels)));
   const quizDesign = useMemo(
@@ -243,6 +254,8 @@ function AppContent() {
         foldProgress={foldProgress}
         setFoldProgress={setFoldByHand}
         onPlayFold={playFold}
+        faceLabels={liveLabels}
+        onSetLabel={setFaceLabel}
         onOpenShapeEditor={() => { setSelectedFace((f) => f || "front"); setShowShapeEditor(true); }}
         onOpenShare={() => setShowShareModal(true)}
         onStartQuiz={() => { setSelectedFace(null); setShowQuiz(true); }}
@@ -325,10 +338,6 @@ function AppContent() {
           })}
           onSignIn={() => setShowAuthModal(true)}
           foldProgress={foldProgress}
-          onApply={(labels, turns) => {
-            applyLabels(activeNetId, netTransform, labels, turns);
-            setShowShareModal(false);
-          }}
         />
       )}
       {showShapeEditor && selectedFace && (

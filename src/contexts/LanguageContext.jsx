@@ -52,6 +52,9 @@ const translations = {
     randomize: "Random colours",
     clearAll: "Clear all faces",
     faceColor: "Colour",
+    letter: "Letter",
+    letterPlaceholder: "e.g. A, 1",
+    letterReplaces: "Typing a letter replaces the picture on this face.",
     customColor: "Other colour",
     picture: "Picture",
     uploadPicture: "Add a picture",
@@ -117,21 +120,16 @@ const translations = {
     // share / QR
     share: "Share / QR",
     shareTitle: "Share / QR code",
-    shareTabBox: "This box",
-    shareTabLabels: "Worksheet letters",
-    shareBoxLetters: "This box only has letters, so the link carries them itself — no sign-in needed.",
+    shareSubtitle: "A link and QR code that open this box as it is now.",
+    shareBoxLetters: "This box only has letters (and blank faces), so the link carries them itself — no sign-in needed. Type letters in Decorate → Letter.",
     shareBoxSaved: "The link opens a copy of the box as it is now (also in My boxes, where you can stop sharing). Changed the box? Make a new link.",
     shareNeedsSignIn: "This box has pictures, colours or shapes. To share it, a copy is saved to your account — please sign in first.",
     shareMakeLinkHint: "A copy of the box as it is now will be saved to My boxes and shared with a link.",
     shareMakeLink: "Make a link for this box",
     shareBoxFailed: "Couldn't make the link. Check your connection and try again.",
     sharedTitle: "Shared box",
-    shareHint: "Type a label on each square (letters, numbers or Thai). Pictures and shapes don't go into the link — save the box and share it from My boxes for that.",
-    square: "Square",
-    shareTurn: "Turn label 90°",
     shareStartFolded: "Open folded",
     shareStartQuiz: "Open in guess mode",
-    shareApply: "Use these labels on the box",
     shareCopy: "Copy link",
     shareCopied: "Link copied",
     shareDownloadQr: "Download QR",
@@ -265,6 +263,9 @@ const translations = {
     randomize: "สุ่มสี",
     clearAll: "ล้างทุกหน้า",
     faceColor: "สี",
+    letter: "ตัวอักษร",
+    letterPlaceholder: "เช่น A, ก, 1",
+    letterReplaces: "พิมพ์ตัวอักษรแล้วจะแทนที่รูปบนหน้านี้",
     customColor: "สีอื่น",
     picture: "รูปภาพ",
     uploadPicture: "ใส่รูปภาพ",
@@ -330,21 +331,16 @@ const translations = {
     // share / QR
     share: "แชร์ / QR",
     shareTitle: "แชร์ / QR",
-    shareTabBox: "กล่องนี้",
-    shareTabLabels: "ตัวอักษรสำหรับชีท",
-    shareBoxLetters: "กล่องนี้มีแค่ตัวอักษร ลิงก์เลยเก็บตัวอักษรไว้ในตัว ไม่ต้องเข้าสู่ระบบ",
+    shareSubtitle: "ลิงก์และ QR ที่เปิดกล่องนี้ตามที่เห็นตอนนี้",
+    shareBoxLetters: "กล่องนี้มีแค่ตัวอักษร (กับหน้าว่าง) ลิงก์เลยเก็บตัวอักษรไว้ในตัว ไม่ต้องเข้าสู่ระบบ ใส่ตัวอักษรได้ที่ ตกแต่ง → ตัวอักษร",
     shareBoxSaved: "ลิงก์นี้เปิดสำเนาของกล่องตอนนี้ (อยู่ใน \"กล่องของฉัน\" ด้วย เลิกแชร์ได้จากตรงนั้น) ถ้าแก้กล่องต่อ ให้สร้างลิงก์ใหม่",
     shareNeedsSignIn: "กล่องนี้มีรูป สี หรือรูปทรง จะแชร์ได้ต้องเก็บสำเนาไว้ในบัญชีก่อน เข้าสู่ระบบก่อนนะ",
     shareMakeLinkHint: "จะเก็บสำเนากล่องตอนนี้ไว้ใน \"กล่องของฉัน\" แล้วแชร์ด้วยลิงก์",
     shareMakeLink: "สร้างลิงก์ของกล่องนี้",
     shareBoxFailed: "สร้างลิงก์ไม่สำเร็จ ลองเช็กอินเทอร์เน็ตแล้วลองใหม่",
     sharedTitle: "กล่องที่แชร์",
-    shareHint: "พิมพ์ตัวอักษรลงแต่ละช่อง (อังกฤษ ตัวเลข หรือไทย) รูปภาพและรูปทรงจะไม่ไปกับลิงก์ ถ้าต้องการ ให้บันทึกกล่องแล้วแชร์จาก \"กล่องของฉัน\"",
-    square: "ช่องที่",
-    shareTurn: "หมุนตัวอักษร 90°",
     shareStartFolded: "เปิดมาแบบพับแล้ว",
     shareStartQuiz: "เปิดมาเป็นโหมดทาย",
-    shareApply: "ใช้ตัวอักษรนี้กับกล่อง",
     shareCopy: "คัดลอกลิงก์",
     shareCopied: "คัดลอกลิงก์แล้ว",
     shareDownloadQr: "ดาวน์โหลด QR",
@@ -443,7 +439,7 @@ export function LanguageProvider({ children }) {
       const saved = localStorage.getItem("appLang");
       if (saved === "th" || saved === "en") return saved;
     } catch { /* storage blocked */ }
-    return (navigator.language || "").toLowerCase().startsWith("en") ? "en" : "th";
+    return "th"; // Thai unless the user picked English in Settings
   });
 
   useEffect(() => {
