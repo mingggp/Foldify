@@ -33,6 +33,7 @@ function ExportRenderer() {
     const onRender = (e) => {
       const { id, width, height, zoom = 1, view = "current", grid = false, shadow = true, background = "transparent", target = null } = e.detail || {};
       const cam = camera.clone();
+      cam.clearViewOffset(); // the on-screen sideways shift is not part of the picture
       if (view === "iso") {
         cam.position.copy(TARGET).addScaledVector(HOME_DIR, 13.5);
         cam.up.set(0, 1, 0);

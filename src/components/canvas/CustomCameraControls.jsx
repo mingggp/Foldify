@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useContext, useEffect, useRef } from 'react';
+import { ViewShiftContext } from './viewShift';
 import { useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
@@ -27,7 +28,14 @@ export default function CustomCameraControls({
   autoRotateSpeed = 2.0,
   home = [7.8, 8.8, 7.8], // isometric: 45° round, ~35° down
 }) {
-  const { camera, gl } = useThree();
+  const { camera, gl, size } = useThree();
+  // move the picture sideways (docked tools panel), without moving the camera itself
+  const shift = useContext(ViewShiftContext);
+  useEffect(() => {
+    if (shift) camera.setViewOffset(size.width, size.height, -shift, 0, size.width, size.height);
+    else camera.clearViewOffset();
+    camera.updateProjectionMatrix();
+  }, [camera, shift, size.width, size.height]);
   const targetV = useRef(new THREE.Vector3(...target));
 
   const state = useRef({

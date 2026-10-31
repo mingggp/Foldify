@@ -116,20 +116,21 @@ export default function Sidebar({ closeSidebar, quizOpen, onOpenShapeEditor, fac
 
 
   return (
-    <aside className="glass max-lg:bg-surface h-full lg:rounded-[26px] flex flex-col overflow-hidden">
-      {/* header */}
-      <div className="px-4 pt-4 pb-3 flex items-center justify-between">
-        <Logo />
-        <div className="flex gap-1">
+    <aside className="glass glass-panel max-lg:bg-surface h-full lg:rounded-[26px] flex flex-col overflow-hidden">
+      {/* header: the wordmark, centred. Settings sit in the top bar on large screens,
+          and here (left, opposite the close button) in the drawer on small ones. */}
+      <div className="relative px-4 pt-5 pb-4 flex items-center justify-center">
+        <span className="lg:hidden absolute left-3 top-1/2 -translate-y-1/2">
           <IconButton label={t("settings")} onClick={() => setShowSettingsModal(true)}>
             <Settings size={19} />
           </IconButton>
-          <span className="lg:hidden">
-            <IconButton label={t("close")} onClick={closeSidebar}>
-              <X size={19} />
-            </IconButton>
-          </span>
-        </div>
+        </span>
+        <Logo />
+        <span className="lg:hidden absolute right-3 top-1/2 -translate-y-1/2">
+          <IconButton label={t("close")} onClick={closeSidebar}>
+            <X size={19} />
+          </IconButton>
+        </span>
       </div>
 
       <div className="flex-1 overflow-y-auto scroll-area scrollbar-hide px-4 pb-4 space-y-4">
