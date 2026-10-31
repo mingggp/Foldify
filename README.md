@@ -74,6 +74,12 @@ The **Share / QR** button builds a link (and a downloadable QR code) for the net
 - The previous interface is kept on the `legacy/ui-v1` branch.
 - Logo ideas: `design/logo-proposals/board.png`.
 
+## ✏️ Shape editor
+
+Decorate tab → "Open the shape editor". Per face: ready-made shapes (basic, lines, arrows, free-form), or **Draw your own** — tap points, lines join them, tap the first point to close a filled shape (or finish as an open line). Points snap to a 64 px grid and onto other shapes' corners, so lines can be joined up. Shapes can be moved, resized, turned, mirrored, recoloured, outlined and reordered; every finished change is one undo step.
+
+All drawing goes through `src/lib/shapes.js` (canvas `Path2D`), used by both the editor and the 3D box, so the editor shows exactly what lands on the face. Pen shapes store their corners as a flat number list (`pts`) because Firestore can't store arrays inside arrays. Old square / circle / star stickers still load.
+
 ## 🧪 Tests
 
 ```bash

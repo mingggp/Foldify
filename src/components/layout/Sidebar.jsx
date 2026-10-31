@@ -1,4 +1,4 @@
-import { Download, Settings, X, ImagePlus, Trash2, FlipHorizontal, FlipVertical, RotateCcw, RotateCw, Undo2, Redo2, Square, Circle, Star, Loader2, Save, LogOut, LogIn, Images, ScanLine, Copy, ClipboardPaste, Shuffle, Eraser, Plus } from "lucide-react";
+import { Download, Settings, X, ImagePlus, Trash2, FlipHorizontal, FlipVertical, RotateCcw, RotateCw, Undo2, Redo2, Shapes, Loader2, Save, LogOut, LogIn, Images, ScanLine, Copy, ClipboardPaste, Shuffle, Eraser, Plus } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import NetSelector from "../NetSelector";
 import Logo from "../ui/Logo";
@@ -20,7 +20,7 @@ function IconButton({ label, children, ...rest }) {
   );
 }
 
-export default function Sidebar({ closeSidebar, quizOpen, facesConfig, setFacesConfig, undoFaces, redoFaces, canUndo, canRedo, selectedFace, setSelectedFace, activeNetId, setActiveNetId, netFlipX, setNetFlipX, netFlipY, setNetFlipY, netRotation = 0, setNetRotation, setShowAuthModal, setShowGalleryModal, setShowSettingsModal, setShowExportModal, setExportImageBlob }) {
+export default function Sidebar({ closeSidebar, quizOpen, onOpenShapeEditor, facesConfig, setFacesConfig, undoFaces, redoFaces, canUndo, canRedo, selectedFace, setSelectedFace, activeNetId, setActiveNetId, netFlipX, setNetFlipX, netFlipY, setNetFlipY, netRotation = 0, setNetRotation, setShowAuthModal, setShowGalleryModal, setShowSettingsModal, setShowExportModal, setExportImageBlob }) {
   const [isSaving, setIsSaving] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [clipboardFaceConfig, setClipboardFaceConfig] = useState(null);
@@ -105,35 +105,6 @@ export default function Sidebar({ closeSidebar, quizOpen, facesConfig, setFacesC
     setFacesConfig((prev) => ({ ...prev, [selectedFace]: { ...prev[selectedFace], [key]: value } }));
   };
 
-  const handleAddShape = (type) => {
-    if (!selectedFace) return;
-    setFacesConfig((prev) => {
-      const currentShapes = prev[selectedFace].shapes || [];
-      const newShape = { id: Date.now(), type, x: 512, y: 512, scale: 1, rotation: 0, color: prev[selectedFace].color === "#ffffff" ? "#28a1ab" : "#ffffff" };
-      return { ...prev, [selectedFace]: { ...prev[selectedFace], shapes: [...currentShapes, newShape], activeShapeIndex: currentShapes.length } };
-    });
-  };
-
-  const handleUpdateShape = (updates) => {
-    setFacesConfig((prev) => {
-      const current = prev[selectedFace];
-      const idx = current.activeShapeIndex;
-      if (idx === null || idx === undefined) return prev;
-      const shapes = [...current.shapes];
-      shapes[idx] = { ...shapes[idx], ...updates };
-      return { ...prev, [selectedFace]: { ...current, shapes } };
-    });
-  };
-
-  const handleDeleteShape = () => {
-    setFacesConfig((prev) => {
-      const current = prev[selectedFace];
-      const idx = current.activeShapeIndex;
-      if (idx === null || idx === undefined) return prev;
-      return { ...prev, [selectedFace]: { ...current, shapes: current.shapes.filter((_, i) => i !== idx), activeShapeIndex: null } };
-    });
-  };
-
   const handleImageUpload = (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -150,8 +121,6 @@ export default function Sidebar({ closeSidebar, quizOpen, facesConfig, setFacesC
     window.addEventListener("snapshot-ready", onSnapshotReady);
     return () => window.removeEventListener("snapshot-ready", onSnapshotReady);
   }, [setExportImageBlob, setShowExportModal]);
-
-  const activeShape = face && face.activeShapeIndex != null ? face.shapes?.[face.activeShapeIndex] : null;
 
   return (
     <aside className="glass max-lg:bg-surface h-full lg:rounded-[26px] flex flex-col overflow-hidden">
@@ -313,51 +282,14 @@ export default function Sidebar({ closeSidebar, quizOpen, facesConfig, setFacesC
                   )}
                 </div>
 
-                {/* stickers */}
+                {/* shapes */}
                 <div className="space-y-2">
                   <h3 className="section-title">{t("stickers")}</h3>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    <button onClick={() => handleAddShape("square")} className="btn btn-soft" aria-label={t("stickerSquare")} title={t("stickerSquare")}><Square size={16} /></button>
-                    <button onClick={() => handleAddShape("circle")} className="btn btn-soft" aria-label={t("stickerCircle")} title={t("stickerCircle")}><Circle size={16} /></button>
-                    <button onClick={() => handleAddShape("star")} className="btn btn-soft" aria-label={t("stickerStar")} title={t("stickerStar")}><Star size={16} /></button>
-                  </div>
-
-                  {activeShape ? (
-                    <div className="rounded-xl border border-line bg-surface-2 p-3 space-y-2 anim-rise">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold">{t(`sticker_${activeShape.type}`)}</span>
-                        <div className="flex items-center gap-1">
-                          <label className="w-8 h-8 rounded-lg border border-line cursor-pointer relative overflow-hidden" style={{ background: activeShape.color }} title={t("stickerColor")}>
-                            <input type="color" value={activeShape.color} onChange={(e) => handleUpdateShape({ color: e.target.value })} className="absolute inset-0 opacity-0 cursor-pointer" aria-label={t("stickerColor")} />
-                          </label>
-                          <IconButton label={t("stickerDelete")} onClick={handleDeleteShape}><Trash2 size={16} /></IconButton>
-                          <button className="btn btn-ghost text-xs" onClick={() => updateFaceConfig("activeShapeIndex", null)}>{t("done")}</button>
-                        </div>
-                      </div>
-                      {[
-                        ["x", t("stickerX"), 0, 1024, 1],
-                        ["y", t("stickerY"), 0, 1024, 1],
-                        ["scale", t("stickerSize"), 0.1, 5, 0.1],
-                        ["rotation", t("stickerTurn"), 0, 360, 1],
-                      ].map(([key, label, min, max, step]) => (
-                        <label key={key} className="grid grid-cols-[4.5rem_1fr] items-center gap-2 text-xs text-muted">
-                          {label}
-                          <input type="range" min={min} max={max} step={step} value={activeShape[key]} onChange={(e) => handleUpdateShape({ [key]: parseFloat(e.target.value) })} className="mini w-full" />
-                        </label>
-                      ))}
-                    </div>
-                  ) : (
-                    face.shapes?.length > 0 && (
-                      <div className="flex gap-1.5 flex-wrap">
-                        {face.shapes.map((s, i) => (
-                          <button key={s.id} onClick={() => updateFaceConfig("activeShapeIndex", i)} className="btn btn-soft h-8 text-xs px-2.5">
-                            <span className="w-3 h-3 rounded-sm" style={{ background: s.color }} />
-                            {t(`sticker_${s.type}`)} {i + 1}
-                          </button>
-                        ))}
-                      </div>
-                    )
-                  )}
+                  <button onClick={onOpenShapeEditor} className="btn btn-soft w-full h-12" data-testid="open-shape-editor">
+                    <Shapes size={18} className="text-brand-ink" />
+                    {t("editShapes")}
+                  </button>
+                  <p className="hint">{face.shapes?.length ? t("shapesCount").replace("{n}", face.shapes.length) : t("shapesNone")}</p>
                 </div>
               </>
             )}
