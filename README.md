@@ -53,6 +53,19 @@ An interactive web-based 3D box builder application designed for the "Computer E
    ```
    The application will be available at `http://localhost:5173`.
 
+## 🔗 Worksheet links, QR codes & guess mode
+
+The **Share / QR** button builds a link (and a downloadable QR code) for the net on screen — type a label on each square, optionally turn labels, choose whether it opens folded or in guess mode. Teachers never need to write the format by hand.
+
+```
+?v=1&net=3&labels=ABCDEF&turn=000100&rot=0&flip=0&fold=0&quiz=1
+?v=1&box=<id>        (a box saved in the Gallery and shared as public)
+```
+
+`labels` go on the squares in reading order (left→right, top→bottom) of the net as shown; Thai works (`labels=กขคงจฉ`), use commas for longer labels. Full description in `src/lib/shareLink.js`. Every link carries `v=` so printed QR codes keep working if the format changes later.
+
+**Guess before folding**: asks "which face is opposite X?", folds the box to reveal the answer, keeps score; "New net" picks a random net and placement for self-practice. On a design without labels it practises on a lettered net and restores the design afterwards.
+
 ## 🧪 Tests
 
 ```bash

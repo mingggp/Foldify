@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import Sidebar from "./Sidebar";
-import { Focus, Menu, X, SlidersHorizontal, ArrowLeftRight, Rotate3D, Cuboid } from "lucide-react";
+import { Focus, Menu, SlidersHorizontal, Rotate3D, Cuboid, QrCode, CircleHelp } from "lucide-react";
+import { useLang } from "../../contexts/LanguageContext";
 
-export default function MainLayout({ children, foldProgress, setFoldProgress, facesConfig, setFacesConfig, undoFaces, redoFaces, canUndo, canRedo, selectedFace, setSelectedFace, sidebarPosition, setShowSettingsModal, setShowExportModal, setExportImageBlob, setShowAuthModal, setShowGalleryModal, activeNetId, setActiveNetId, netFlipX, setNetFlipX, netFlipY, setNetFlipY, netRotation, setNetRotation, isAutoRotate, setIsAutoRotate }) {
+export default function MainLayout({ children, foldProgress, setFoldProgress, facesConfig, setFacesConfig, undoFaces, redoFaces, canUndo, canRedo, selectedFace, setSelectedFace, sidebarPosition, setShowSettingsModal, setShowExportModal, setExportImageBlob, setShowAuthModal, setShowGalleryModal, activeNetId, setActiveNetId, netFlipX, setNetFlipX, netFlipY, setNetFlipY, netRotation, setNetRotation, isAutoRotate, setIsAutoRotate, onOpenShare, onStartQuiz, isQuizOpen, quizPanel }) {
+  const { t } = useLang();
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -80,6 +82,27 @@ export default function MainLayout({ children, foldProgress, setFoldProgress, fa
 
           <div className="flex gap-2">
             <button
+              onClick={onStartQuiz}
+              disabled={isQuizOpen}
+              data-testid="open-quiz"
+              className="pointer-events-auto flex items-center gap-2 bg-white/80 hover:bg-white text-slate-700 border-slate-200 dark:bg-slate-800/80 dark:hover:bg-slate-800 dark:text-slate-200 dark:border-slate-700 backdrop-blur-sm px-3 py-2 rounded-lg border transition-all font-medium text-xs md:text-sm shadow-sm disabled:opacity-50"
+              title={t('quiz')}
+            >
+              <CircleHelp size={16} />
+              <span className="hidden md:inline">{t('quiz')}</span>
+            </button>
+
+            <button
+              onClick={onOpenShare}
+              data-testid="open-share"
+              className="pointer-events-auto flex items-center gap-2 bg-white/80 hover:bg-white text-slate-700 border-slate-200 dark:bg-slate-800/80 dark:hover:bg-slate-800 dark:text-slate-200 dark:border-slate-700 backdrop-blur-sm px-3 py-2 rounded-lg border transition-all font-medium text-xs md:text-sm shadow-sm"
+              title={t('share')}
+            >
+              <QrCode size={16} />
+              <span className="hidden md:inline">{t('share')}</span>
+            </button>
+
+            <button
               onClick={() => setIsAutoRotate(!isAutoRotate)}
               className={`pointer-events-auto flex items-center gap-2 px-3 py-2 rounded-lg border transition-all font-medium text-xs md:text-sm shadow-sm ${isAutoRotate ? 'bg-indigo-500 text-white border-indigo-400' : 'bg-white/80 hover:bg-white text-slate-700 border-slate-200 dark:bg-slate-800/80 dark:hover:bg-slate-800 dark:text-slate-200 dark:border-slate-700 backdrop-blur-sm'}`}
               title="หมุนอัตโนมัติ"
@@ -97,6 +120,8 @@ export default function MainLayout({ children, foldProgress, setFoldProgress, fa
             </button>
           </div>
         </div>
+
+        {quizPanel}
 
         {/* Floating Bottom Folding Control */}
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 pointer-events-auto w-[90%] max-w-sm">
