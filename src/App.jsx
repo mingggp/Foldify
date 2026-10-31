@@ -196,8 +196,10 @@ function AppContent() {
     getBox(initialLink.box)
       .then((box) => {
         if (cancelled) return;
-        if (box) handleLoadBox(box);
-        else toast(t("boxLinkFailed"), "error");
+        if (!box) return toast(t("boxLinkFailed"), "error");
+        handleLoadBox(box);
+        if (initialLink.fold) setFoldByHand(initialLink.fold);
+        if (initialLink.quiz) setShowQuiz(true);
       })
       .catch(() => { if (!cancelled) toast(t("boxLinkFailed"), "error"); });
     return () => { cancelled = true; };
@@ -316,6 +318,12 @@ function AppContent() {
           netIndex={activeNetId}
           transform={netTransform}
           faceLabels={liveLabels}
+          facesConfig={facesConfig}
+          labelOnly={FACE_KEYS.every((k) => {
+            const f = facesConfig[k];
+            return !f.shapes?.length && f.color === "#ffffff" && !f.flipX && !f.flipY && (!f.textureUrl || !!liveLabels[k]);
+          })}
+          onSignIn={() => setShowAuthModal(true)}
           foldProgress={foldProgress}
           onApply={(labels, turns) => {
             applyLabels(activeNetId, netTransform, labels, turns);

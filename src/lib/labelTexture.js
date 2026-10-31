@@ -21,12 +21,18 @@ export function makeLabelTexture(label, { background = "#ffffff", color = "#0f17
       fontSize -= 10;
       x.font = font(fontSize);
     }
-    // Centre on the glyph box, not the font box, so Thai and Latin both sit in the middle
-    const m = x.measureText(label);
-    const glyphH = (m.actualBoundingBoxAscent || fontSize * 0.7) + (m.actualBoundingBoxDescent || 0);
-    const y = size / 2 + (m.actualBoundingBoxAscent ? m.actualBoundingBoxAscent - glyphH / 2 : 0);
+    // Centre on the glyph's own ink box (measured against the alphabetic baseline — measuring
+    // with "middle" and drawing with "alphabetic" pushed every letter upwards), so Thai with
+    // vowels / tone marks and Latin letters all sit in the middle of the face.
     x.textBaseline = "alphabetic";
-    x.fillText(label, size / 2, y);
+    const m = x.measureText(label);
+    const ascent = m.actualBoundingBoxAscent ?? fontSize * 0.72;
+    const descent = m.actualBoundingBoxDescent ?? 0;
+    const y = size / 2 + (ascent - descent) / 2;
+    // ink spans [anchor - left, anchor + right] (textAlign is "center")
+    const left = m.actualBoundingBoxLeft ?? m.width / 2;
+    const right = m.actualBoundingBoxRight ?? m.width / 2;
+    x.fillText(label, size / 2 + (left - right) / 2, y);
   }
   const url = c.toDataURL("image/png");
   cache.set(key, url);

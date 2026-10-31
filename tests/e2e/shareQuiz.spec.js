@@ -57,6 +57,7 @@ test('Share dialog: type labels, get a link + QR that reopens the same box', asy
   await page.evaluate(() => { window.__foldify.setActiveNetId(2); window.__foldify.setNetTransform({ rotation: 1 }) })
   await page.waitForFunction(() => window.__foldify.state.activeNetId === 2 && window.__foldify.state.netRotation === 1)
   await page.getByTestId('open-share').click()
+  await page.getByRole('radio', { name: 'Worksheet letters' }).click()
   const letters = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ']
   for (let i = 0; i < 6; i++) await page.getByTestId(`share-label-${i}`).fill(letters[i])
   await page.getByTestId('share-turn-2').click()
@@ -80,4 +81,27 @@ test('Share dialog: type labels, get a link + QR that reopens the same box', asy
   expect(opened.faceLabels).toEqual(applied.faceLabels)
   expect([opened.net, opened.rot]).toEqual([2, 1])
   await expect(other.getByTestId('quiz')).toBeVisible() // opened straight into guess mode
+})
+
+test('Share "this box": a letters-only box gets a plain link at once', async ({ page }) => {
+  await page.goto('/?v=1&net=2&labels=ABCDEF&turn=010000')
+  await ready(page)
+  await page.getByTestId('open-share').click()
+  await expect(page.getByTestId('share-preview').locator('canvas')).toHaveCount(1)
+  const link = await page.getByTestId('share-link').inputValue()
+  expect(link).toContain('net=2')
+  expect(link).toContain('labels=ABCDEF')
+  expect(link).toContain('turn=010000')
+  await expect(page.getByTestId('share-qr')).toBeVisible()
+})
+
+test('Share "this box": a box with colours or pictures asks to sign in (saved copy)', async ({ page }) => {
+  await page.goto('/')
+  await ready(page)
+  await page.evaluate(() => window.__foldify.setFacesConfig((prev) => ({ ...prev, top: { ...prev.top, color: '#ffb238' } })))
+  await page.getByTestId('open-share').click()
+  await expect(page.getByTestId('share-signin')).toBeVisible()
+  await expect(page.getByTestId('share-link')).toHaveCount(0)
+  await page.getByTestId('share-signin').click()
+  await expect(page.getByTestId('auth')).toBeVisible()
 })

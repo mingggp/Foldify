@@ -89,6 +89,8 @@ input, textarea, select, .scroll-area { touch-action: auto; }
   outline: 2px solid var(--mint);
   outline-offset: 2px;
 }
+/* dialogs take focus themselves when they open; no ring around the whole dialog */
+[role="dialog"]:focus-visible { outline: none; }
 
 @layer components {
   .glass {

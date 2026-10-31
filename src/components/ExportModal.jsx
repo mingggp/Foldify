@@ -12,39 +12,91 @@ const LONG_SIDE = 2048; // output pixels on the long side — sharp enough to pr
  * The preview IS the exported picture (rendered by Scene's ExportRenderer with these options),
  * so what you see is what you get. Selection highlights are never included.
  */
+const PREVIEW_SIDE = 1024; // live preview: drawn straight into a canvas, no PNG encoding
+
+/** Ask the 3D scene (Scene.jsx ExportRenderer) to render once. target: a canvas to draw into, else a PNG URL comes back. */
+function renderExport(detail) {
+  return new Promise((resolve) => {
+    const id = `${Date.now()}-${Math.random()}`;
+    const onDone = (e) => {
+      if (e.detail?.id !== id) return;
+      window.removeEventListener("export-rendered", onDone);
+      resolve(e.detail.url);
+    };
+    window.addEventListener("export-rendered", onDone);
+    window.dispatchEvent(new CustomEvent("export-render", { detail: { ...detail, id } }));
+  });
+}
+
+const clampZoom = (z) => Math.min(3, Math.max(0.5, z));
+
 export default function ExportModal({ onClose, showShadows }) {
   const toast = useToast();
   const { t } = useLang();
   const [opts, setOpts] = useState({ view: "iso", ratio: "1:1", zoom: 1.8, grid: false, shadow: false, background: "white" });
-  const [url, setUrl] = useState(null);
-  const [busy, setBusy] = useState(true);
-  const reqId = useRef(0);
+  const [saving, setSaving] = useState(false);
+  const preview = useRef(null);
+  const frame = useRef(null);
 
   const set = (patch) => setOpts((o) => ({ ...o, ...patch }));
+  const size = (side) => ({ width: side, height: Math.round(side / RATIOS[opts.ratio]) });
+  const detail = (side) => ({ ...size(side), ...opts, shadow: opts.shadow && showShadows });
 
-  // ask the 3D scene for a fresh render whenever an option changes (debounced for the slider)
+  // live preview: re-render on the next frame whenever an option changes
   useEffect(() => {
-    const id = ++reqId.current;
-    const r = RATIOS[opts.ratio];
-    const width = LONG_SIDE;
-    const height = Math.round(LONG_SIDE / r);
-    const onDone = (e) => {
-      if (e.detail?.id !== id) return;
-      setUrl(e.detail.url);
-      setBusy(false);
-    };
-    window.addEventListener("export-rendered", onDone);
-    const timer = setTimeout(() => {
-      setBusy(true);
-      window.dispatchEvent(new CustomEvent("export-render", { detail: { id, width, height, ...opts, shadow: opts.shadow && showShadows } }));
-    }, 120);
-    return () => { clearTimeout(timer); window.removeEventListener("export-rendered", onDone); };
+    const raf = requestAnimationFrame(() => {
+      const c = preview.current;
+      if (!c) return;
+      const { width, height } = size(PREVIEW_SIDE);
+      if (c.width !== width || c.height !== height) { c.width = width; c.height = height; }
+      renderExport({ ...detail(PREVIEW_SIDE), target: c });
+    });
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opts, showShadows]);
+
+  // mouse wheel / trackpad pinch over the picture zooms it (no page scroll)
+  useEffect(() => {
+    const el = frame.current;
+    if (!el) return;
+    const onWheel = (e) => {
+      e.preventDefault();
+      const step = Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015));
+      setOpts((o) => ({ ...o, zoom: clampZoom(o.zoom * step) }));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
+  // two-finger pinch on iPad
+  const pinch = useRef(null);
+  const pointers = useRef(new Map());
+  const onPointer = (e) => {
+    if (e.type === "pointerdown") pointers.current.set(e.pointerId, [e.clientX, e.clientY]);
+    else if (e.type === "pointermove" && pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, [e.clientX, e.clientY]);
+    else pointers.current.delete(e.pointerId);
+    const pts = [...pointers.current.values()];
+    if (pts.length === 2) {
+      const d = Math.hypot(pts[0][0] - pts[1][0], pts[0][1] - pts[1][1]);
+      if (pinch.current) setOpts((o) => ({ ...o, zoom: clampZoom(pinch.current.zoom * (d / pinch.current.d)) }));
+      else pinch.current = { d, zoom: opts.zoom };
+    } else pinch.current = null;
+  };
 
   const fileName = `foldify-${opts.ratio.replace(":", "x")}.png`;
 
-  const handleDownload = () => {
-    if (!url) return;
+  const finalPicture = async () => {
+    setSaving(true);
+    try {
+      return await renderExport(detail(LONG_SIDE));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    const url = await finalPicture();
+    if (!url) return toast(t("exportFailed"), "error");
     const link = document.createElement("a");
     link.href = url;
     link.download = fileName;
@@ -55,8 +107,8 @@ export default function ExportModal({ onClose, showShadows }) {
   };
 
   const handleCopy = async () => {
-    if (!url) return;
     try {
+      const url = await finalPicture();
       const blob = await (await fetch(url)).blob();
       await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
       toast(t("exportCopied"), "success");
@@ -78,18 +130,29 @@ export default function ExportModal({ onClose, showShadows }) {
       testId="export"
       footer={
         <>
-          <button onClick={handleCopy} disabled={!url || busy} className="btn btn-soft h-11"><Copy size={17} />{t("exportCopy")}</button>
-          <button onClick={handleDownload} disabled={!url || busy} className="btn btn-primary h-11" data-testid="export-save"><Download size={17} />{t("exportSave")}</button>
+          <button onClick={handleCopy} disabled={saving} className="btn btn-soft h-11"><Copy size={17} />{t("exportCopy")}</button>
+          <button onClick={handleDownload} disabled={saving} className="btn btn-primary h-11" data-testid="export-save">
+            {saving ? <Loader2 size={17} className="animate-spin" /> : <Download size={17} />}
+            {t("exportSave")}
+          </button>
         </>
       }
     >
       <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_16rem]">
         {/* preview = the exported picture */}
-        <div className="relative grid place-items-center rounded-2xl bg-surface-2 border border-line p-3">
+        <div
+          ref={frame}
+          className="relative grid place-items-center rounded-2xl bg-surface-2 border border-line p-3 touch-none cursor-zoom-in"
+          onPointerDown={onPointer}
+          onPointerMove={onPointer}
+          onPointerUp={onPointer}
+          onPointerCancel={onPointer}
+          title={t("exportWheel")}
+        >
           <div className={`relative w-full ${opts.background === "white" ? "bg-white" : "checkered-bg"} shadow-sm`} style={{ aspectRatio: ratio, maxWidth: `min(100%, calc(58dvh * ${ratio}))` }}>
-            {url && <img src={url} alt={t("exportPreview")} className="absolute inset-0 w-full h-full" data-testid="export-preview" />}
+            <canvas ref={preview} width={PREVIEW_SIDE} height={PREVIEW_SIDE} className="absolute inset-0 w-full h-full" aria-label={t("exportPreview")} role="img" data-testid="export-preview" />
           </div>
-          {busy && <Loader2 size={26} className="absolute animate-spin text-mint" />}
+          <span className="absolute bottom-2 right-3 text-[11px] text-muted pointer-events-none">{t("exportWheel")}</span>
         </div>
 
         <div className="space-y-4">
