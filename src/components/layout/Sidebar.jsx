@@ -1,4 +1,4 @@
-import { Cuboid, PaintBucket, Download, Settings, X, SlidersHorizontal, ImagePlus, Trash2, FlipHorizontal, FlipVertical, RotateCcw, RotateCw, Moon, Sun, Grid3x3, LightbulbOff, Lightbulb, Square, Circle, Star, Trash, Wand2, Loader2, AlertCircle, Save, LogOut, LogIn, Image as ImageIcon, ChevronDown, ChevronRight } from "lucide-react";
+import { Cuboid, PaintBucket, Download, Settings, X, SlidersHorizontal, ImagePlus, Trash2, FlipHorizontal, FlipVertical, RotateCcw, RotateCw, Moon, Sun, Grid3x3, LightbulbOff, Lightbulb, Square, Circle, Star, Trash, Loader2, Save, LogOut, LogIn, Image as ImageIcon, ChevronDown, ChevronRight } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import NetSelector from "../NetSelector";
 import { useAuth } from "../../contexts/AuthContext";
@@ -7,11 +7,8 @@ import { useLang } from "../../contexts/LanguageContext";
 import { analyzeNetImage } from "../../utils/SmartNetAnalyzer";
 import { useToast } from "../../contexts/ToastContext";
 
-export default function Sidebar({ closeSidebar, facesConfig, setFacesConfig, undoFaces, redoFaces, canUndo, canRedo, selectedFace, setSelectedFace, activeNetId, setActiveNetId, netFlipX, setNetFlipX, netFlipY, setNetFlipY, onExport, setShowAuthModal, setShowGalleryModal, setShowSettingsModal }) {
+export default function Sidebar({ closeSidebar, facesConfig, setFacesConfig, undoFaces, redoFaces, canUndo, canRedo, selectedFace, setSelectedFace, activeNetId, setActiveNetId, netFlipX, setNetFlipX, netFlipY, setNetFlipY, netRotation = 0, setNetRotation, onExport, setShowAuthModal, setShowGalleryModal, setShowSettingsModal }) {
 
-  const [aiPrompt, setAiPrompt] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [aiError, setAiError] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [clipboardFaceConfig, setClipboardFaceConfig] = useState(null);
   const [isSetupOpen, setIsSetupOpen] = useState(false);
@@ -28,12 +25,10 @@ export default function Sidebar({ closeSidebar, facesConfig, setFacesConfig, und
 
     try {
       const result = await analyzeNetImage(file);
-      console.log('[SmartScan] Result:', result);
-      console.log('[SmartScan] Net index:', result.activeNetId, '| flipX:', result.netFlipX, '| flipY:', result.netFlipY, '| swapXY:', result.swapXY);
-      console.log('[SmartScan] Faces extracted:', Object.keys(result.extractedFaces));
       setActiveNetId(result.activeNetId);
       setNetFlipX(result.netFlipX);
       setNetFlipY(result.netFlipY);
+      setNetRotation?.(result.netRotation);
 
       setFacesConfig(prev => {
         const next = { ...prev };
@@ -87,7 +82,7 @@ export default function Sidebar({ closeSidebar, facesConfig, setFacesConfig, und
     if (!currentUser) return setShowAuthModal(true);
     try {
       setIsSaving(true);
-      await saveBoxConfig(currentUser.uid, { facesConfig, activeNetId, netFlipX, netFlipY });
+      await saveBoxConfig(currentUser.uid, { facesConfig, activeNetId, netFlipX, netFlipY, netRotation });
       toast('บันทึกลง Gallery สำเร็จแล้ว! 🎉', 'success');
     } catch (err) {
       console.error(err);
@@ -155,58 +150,6 @@ export default function Sidebar({ closeSidebar, facesConfig, setFacesConfig, und
   };
 
   const handleColorChange = (e) => updateFaceConfig('color', e.target.value);
-
-  const handleGenerateAITexture = async () => {
-    if (!aiPrompt.trim()) {
-      setAiError("Please enter a prompt first.");
-      return;
-    }
-
-    setIsGenerating(true);
-    setAiError(null);
-
-    try {
-      const apiKey = import.meta.env.VITE_HUGGINGFACE_TOKEN;
-      if (!apiKey) {
-        throw new Error("Missing VITE_HUGGINGFACE_TOKEN in .env file.");
-      }
-
-      const response = await fetch(
-        "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell",
-        {
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-          },
-          method: "POST",
-          body: JSON.stringify({ inputs: aiPrompt }),
-        }
-      );
-
-      if (!response.ok) {
-        let errorTxt = `API Error: ${response.status} ${response.statusText}`;
-        try {
-          const errObj = await response.json();
-          if (errObj.error) errorTxt = errObj.error;
-        } catch (je) {
-          // ignore json parse error
-        }
-        throw new Error(errorTxt);
-      }
-
-      const blob = await response.blob();
-      const imageUrl = URL.createObjectURL(blob);
-
-      updateFaceConfig('textureUrl', imageUrl);
-      setAiPrompt("");
-
-    } catch (err) {
-      console.error(err);
-      setAiError(err.message);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
 
   const handleImageUpload = (e) => {
     const file = e.target.files?.[0];
@@ -317,13 +260,21 @@ export default function Sidebar({ closeSidebar, facesConfig, setFacesConfig, und
               >
                 <FlipVertical size={14} />
               </button>
+              <button
+                onClick={() => setNetRotation?.((netRotation + 1) % 4)}
+                className={`p-1 rounded transition-colors ${netRotation ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
+                title="Rotate Net 90°"
+                aria-label="Rotate net 90 degrees"
+              >
+                <RotateCw size={14} />
+              </button>
             </div>
           </div>
           <div className="px-1 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[10px] uppercase font-bold text-slate-500">Select Net Form</span>
             </div>
-            <NetSelector activeNetId={activeNetId} setActiveNetId={setActiveNetId} netFlipX={netFlipX} netFlipY={netFlipY} />
+            <NetSelector activeNetId={activeNetId} setActiveNetId={setActiveNetId} netFlipX={netFlipX} netFlipY={netFlipY} netRotation={netRotation} />
           </div>
         </div>
 
@@ -579,45 +530,6 @@ export default function Sidebar({ closeSidebar, facesConfig, setFacesConfig, und
                 )}
               </div>
 
-              {/* AI Generator */}
-              <div className="space-y-2 pt-3 border-t border-slate-200 dark:border-slate-700">
-                <label className="text-xs font-medium text-slate-600 dark:text-slate-400">{t('aiGenerator')}</label>
-                <textarea
-                  value={aiPrompt}
-                  onChange={e => setAiPrompt(e.target.value)}
-                  placeholder={t('aiPlaceholder')}
-                  className="w-full h-16 resize-none bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 text-xs text-slate-700 dark:text-slate-300 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  disabled={isGenerating}
-                />
-
-                {aiError && (
-                  <div className="flex items-center gap-1.5 text-red-500 text-[10px] bg-red-50 dark:bg-red-900/20 p-1.5 rounded border border-red-100 dark:border-red-900/50 mt-1">
-                    <AlertCircle size={12} className="flex-shrink-0" />
-                    <span className="leading-tight">{aiError}</span>
-                  </div>
-                )}
-
-                <button
-                  onClick={handleGenerateAITexture}
-                  disabled={isGenerating || !aiPrompt.trim()}
-                  className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-colors mt-2 ${isGenerating || !aiPrompt.trim()
-                    ? 'bg-indigo-100 text-indigo-400 dark:bg-indigo-900/30 dark:text-indigo-400/50 cursor-not-allowed'
-                    : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm'
-                    }`}
-                >
-                  {isGenerating ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      {t('aiLoading')}
-                    </>
-                  ) : (
-                    <>
-                      <Wand2 size={16} />
-                      {t('aiGenerateBtn')}
-                    </>
-                  )}
-                </button>
-              </div>
 
             </div>
           )}

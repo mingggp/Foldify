@@ -1,11 +1,21 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { Canvas, useThree, useFrame } from "@react-three/fiber";
-import { Environment, Grid } from "@react-three/drei";
+import { Environment, Grid, Lightformer } from "@react-three/drei";
 import * as THREE from 'three';
 import { analyzeNetImage } from "../../utils/SmartNetAnalyzer";
 import { useToast } from "../../contexts/ToastContext";
 import CustomCameraControls from "./CustomCameraControls";
 import Box from "./Box";
+
+// Dev/test-only: expose the three.js scene to the Playwright tests.
+function TestBridge() {
+  const { scene, camera, gl, invalidate, size } = useThree();
+  useEffect(() => {
+    const hook = (window.__foldify = window.__foldify || {});
+    hook.three = { scene, camera, gl, invalidate, size, THREE };
+  }, [scene, camera, gl, invalidate, size]);
+  return null;
+}
 
 // Simple helper that lives inside R3F context and can directly access gl
 function SnapshotCapture({ onCapture }) {
@@ -32,7 +42,7 @@ function SnapshotCapture({ onCapture }) {
   return null;
 }
 
-function CanvasDropHandler({ setFacesConfig, setActiveNetId, setNetFlipX, setNetFlipY }) {
+function CanvasDropHandler({ setFacesConfig, setActiveNetId, setNetFlipX, setNetFlipY, setNetRotation }) {
   const { camera, scene, raycaster } = useThree();
   const toast = useToast();
 
@@ -85,6 +95,7 @@ function CanvasDropHandler({ setFacesConfig, setActiveNetId, setNetFlipX, setNet
           setActiveNetId(result.activeNetId);
           setNetFlipX(result.netFlipX);
           setNetFlipY(result.netFlipY);
+          setNetRotation?.(result.netRotation);
 
           setFacesConfig(prev => {
             const next = { ...prev };
@@ -116,12 +127,12 @@ function CanvasDropHandler({ setFacesConfig, setActiveNetId, setNetFlipX, setNet
         canvasDOM.removeEventListener('drop', handleDrop);
       }
     };
-  }, [camera, scene, raycaster, setFacesConfig, setActiveNetId, setNetFlipX, setNetFlipY]);
+  }, [camera, scene, raycaster, setFacesConfig, setActiveNetId, setNetFlipX, setNetFlipY, setNetRotation]);
 
   return null;
 }
 
-export default function Scene({ children, theme, showGrid, showShadows, isAutoRotate, setFacesConfig, setActiveNetId, setNetFlipX, setNetFlipY, selectedFace, setSelectedFace }) {
+export default function Scene({ children, theme, showGrid, showShadows, isAutoRotate, setFacesConfig, setActiveNetId, setNetFlipX, setNetFlipY, setNetRotation, selectedFace, setSelectedFace }) {
   const [hideHighlights, setHideHighlights] = useState(false);
 
   // Listen for trigger-snapshot: hide highlights, wait a tick for React render, fire capture, restore
@@ -156,6 +167,7 @@ export default function Scene({ children, theme, showGrid, showShadows, isAutoRo
       <Canvas camera={{ position: [8, 6, 9], fov: 45 }} shadows={showShadows} gl={{ preserveDrawingBuffer: true }}>
         {/* Helper to capture reliable snapshots without UI */}
         <SnapshotCapture onCapture={handleCaptured} />
+        {import.meta.env.DEV && <TestBridge />}
         
         {/* Environment and Lighting */}
         <color attach="background" args={[theme === 'dark' ? '#0f172a' : '#f8fafc']} />
@@ -168,7 +180,14 @@ export default function Scene({ children, theme, showGrid, showShadows, isAutoRo
             shadow-mapSize={1024}
           />
         )}
-        <Environment preset="city" />
+        {/* Reflections come from a tiny studio built in-scene — no HDR download from a CDN,
+            so the scene still renders offline / behind school firewalls. */}
+        <Environment resolution={64} frames={1}>
+          <Lightformer intensity={2} position={[0, 5, -5]} scale={[10, 5, 1]} />
+          <Lightformer intensity={1} position={[-5, 2, 3]} rotation-y={Math.PI / 2} scale={[8, 4, 1]} />
+          <Lightformer intensity={1} position={[5, 2, 3]} rotation-y={-Math.PI / 2} scale={[8, 4, 1]} />
+          <Lightformer intensity={0.6} position={[0, -4, 0]} rotation-x={-Math.PI / 2} scale={[10, 10, 1]} color="#94a3b8" />
+        </Environment>
 
         {setFacesConfig && (
           <CanvasDropHandler
@@ -176,6 +195,7 @@ export default function Scene({ children, theme, showGrid, showShadows, isAutoRo
             setActiveNetId={setActiveNetId}
             setNetFlipX={setNetFlipX}
             setNetFlipY={setNetFlipY}
+            setNetRotation={setNetRotation}
           />
         )}
 

@@ -4,10 +4,6 @@ const translations = {
   en: {
     appTitle: "Foldify",
     uploadImage: "Upload Image",
-    aiGenerator: "✨ AI Texture Generator",
-    aiPlaceholder: "Make a wooden box texture, 4k...",
-    aiLoading: "Generating...",
-    aiGenerateBtn: "Generate with AI",
     exportImage: "Export PNG Snapshot",
     settings: "Settings",
     netGeometry: "NET GEOMETRY",
@@ -32,10 +28,6 @@ const translations = {
   th: {
     appTitle: "Foldify",
     uploadImage: "อัปโหลดรูปภาพ",
-    aiGenerator: "✨ สร้างพื้นผิวด้วย AI",
-    aiPlaceholder: "สร้างลายไม้ สวยๆ 4k...",
-    aiLoading: "กำลังสร้าง...",
-    aiGenerateBtn: "สร้างด้วย AI",
     exportImage: "บันทึกเป็นรูปภาพ (PNG)",
     settings: "ตั้งค่า",
     netGeometry: "รูปแบบรูปคลี่ 2 มิติ",

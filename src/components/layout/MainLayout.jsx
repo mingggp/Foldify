@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import Sidebar from "./Sidebar";
 import { Focus, Menu, X, SlidersHorizontal, ArrowLeftRight, Rotate3D, Cuboid } from "lucide-react";
 
-export default function MainLayout({ children, foldProgress, setFoldProgress, facesConfig, setFacesConfig, undoFaces, redoFaces, canUndo, canRedo, selectedFace, setSelectedFace, sidebarPosition, setShowSettingsModal, setShowExportModal, setExportImageBlob, setShowAuthModal, setShowGalleryModal, activeNetId, setActiveNetId, netFlipX, setNetFlipX, netFlipY, setNetFlipY, isAutoRotate, setIsAutoRotate }) {
+export default function MainLayout({ children, foldProgress, setFoldProgress, facesConfig, setFacesConfig, undoFaces, redoFaces, canUndo, canRedo, selectedFace, setSelectedFace, sidebarPosition, setShowSettingsModal, setShowExportModal, setExportImageBlob, setShowAuthModal, setShowGalleryModal, activeNetId, setActiveNetId, netFlipX, setNetFlipX, netFlipY, setNetFlipY, netRotation, setNetRotation, isAutoRotate, setIsAutoRotate }) {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -40,6 +40,8 @@ export default function MainLayout({ children, foldProgress, setFoldProgress, fa
           setNetFlipX={setNetFlipX}
           netFlipY={netFlipY}
           setNetFlipY={setNetFlipY}
+          netRotation={netRotation}
+          setNetRotation={setNetRotation}
           onExport={(imgStr) => {
             setExportImageBlob(imgStr);
             setShowExportModal(true);

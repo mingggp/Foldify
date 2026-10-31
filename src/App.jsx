@@ -24,6 +24,7 @@ function AppContent() {
   const [activeNetId, setActiveNetId] = useState(0); // Which of the 11 nets is active
   const [netFlipX, setNetFlipX] = useState(false);
   const [netFlipY, setNetFlipY] = useState(false);
+  const [netRotation, setNetRotation] = useState(0); // clockwise quarter turns of the net on paper
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportImageBlob, setExportImageBlob] = useState(null);
   const [isAutoRotate, setIsAutoRotate] = useState(false);
@@ -50,8 +51,24 @@ function AppContent() {
     if (savedData.activeNetId !== undefined) setActiveNetId(savedData.activeNetId);
     setNetFlipX(savedData.netFlipX || false);
     setNetFlipY(savedData.netFlipY || false);
+    setNetRotation(savedData.netRotation || 0);
     setFoldProgress(0); // reset fold so they can see net
   };
+
+  // Dev/test-only hook used by the Playwright tests (tests/e2e). Stripped from production builds.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const hook = (window.__foldify = window.__foldify || {});
+    Object.assign(hook, {
+      setFoldProgress, setActiveNetId, setFacesConfig, setSelectedFace, setShowLabels, setShowGrid, setShowShadows, setTheme, setIsAutoRotate,
+      setNetTransform: ({ rotation = 0, flipX = false, flipY = false } = {}) => {
+        setNetRotation(rotation);
+        setNetFlipX(flipX);
+        setNetFlipY(flipY);
+      },
+      state: { foldProgress, activeNetId, netRotation, netFlipX, netFlipY, facesConfig, showLabels },
+    });
+  }, [foldProgress, activeNetId, netRotation, netFlipX, netFlipY, facesConfig, showLabels, setFacesConfig]);
 
   // Keyboard listener for Undo/Redo
   useEffect(() => {
@@ -90,6 +107,8 @@ function AppContent() {
         setNetFlipX={setNetFlipX}
         netFlipY={netFlipY}
         setNetFlipY={setNetFlipY}
+        netRotation={netRotation}
+        setNetRotation={setNetRotation}
         isAutoRotate={isAutoRotate}
         setIsAutoRotate={setIsAutoRotate}
         >
@@ -102,6 +121,7 @@ function AppContent() {
             setActiveNetId={setActiveNetId}
             setNetFlipX={setNetFlipX}
             setNetFlipY={setNetFlipY}
+            setNetRotation={setNetRotation}
             theme={theme}
             showGrid={showGrid}
             showShadows={showShadows}
@@ -116,6 +136,7 @@ function AppContent() {
             activeNetId={activeNetId}
             netFlipX={netFlipX}
             netFlipY={netFlipY}
+            netRotation={netRotation}
             showLabels={showLabels}
           />
         </Scene>
