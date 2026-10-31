@@ -16,13 +16,16 @@ export default defineConfig({
   testDir: './tests',
   timeout: 120_000,
   fullyParallel: true,
-  reporter: [['list'], ['html', { open: 'never' }]],
+  // On GitHub Actions failures also show up as annotations on the PR
+  reporter: process.env.CI ? [['github'], ['list'], ['html', { open: 'never' }]] : [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: `http://localhost:${PORT}`,
     viewport: { width: 1280, height: 800 },
   },
   projects: [
     { name: 'unit', testDir: './tests/unit' },
+    // Needs the Firestore emulator: run with `npm run test:rules`
+    { name: 'rules', testDir: './tests/rules' },
     {
       name: 'e2e',
       testDir: './tests/e2e',

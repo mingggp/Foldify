@@ -63,7 +63,14 @@ npm test                          # everything, incl. exhaustive Smart Scan matr
 
 Tests start their own dev server with fake Firebase settings, so no real project is needed.
 
+```bash
+npm run test:rules                # Firestore Security Rules on the local emulator (needs Java 21)
+```
+
+GitHub Actions (`.github/workflows/test.yml`) runs the rules tests and `test:quick` on every pull request.
+
 * `tests/unit` — net geometry (all 11 nets × 8 placements fold into a cube, face names match, no duplicate shapes).
+* `tests/rules/firestore.spec.js` — who can create / read / update / delete boxes, and what saved data must look like.
 * `tests/e2e/orientation.spec.js` — puts a letter + coloured corners on every face and checks each face, flat and folded, is upright and **not mirrored**.
 * `tests/e2e/smartScan.spec.js` — draws synthetic net photos, rotates them 0/90/180/270°, scans them and checks the 3D box equals folding the paper by hand.
 
@@ -72,3 +79,12 @@ Tests start their own dev server with fake Firebase settings, so no real project
 * Paper → world: paper-right = +X, paper-up = −Z, printed side faces +Y. Faces fold *down* so the print ends up outside, and only the front (printed) side of each square shows the picture; the back shows plain paper.
 * A net is placed on paper by `{ rotation, flipX, flipY }`. Placements move squares, never mirror the pictures on them.
 * Face names (`top`, `front`, …) are computed from where each square really folds, so labels and the sidebar are always right.
+
+## 🔒 Firestore rules
+
+`firestore.rules` is the source of truth — deploy with `npx firebase-tools deploy --only firestore:rules` (or paste it into Console → Firestore → Rules).
+
+* Only signed-in users can save, and only under their own `userId`; `createdAt` must be the server time.
+* Saved data is validated (known fields only, 6 faces, net 0–10, rotation 0–3, pictures ≤ 120 KB each).
+* Boxes are private by default; the owner can set `visibility: "public"` so anyone can open it by id (for share links / a public gallery). Boxes saved before this change count as private.
+* After saving, the owner can only rename or change visibility. Everything outside `boxes` is closed.

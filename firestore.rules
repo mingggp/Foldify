@@ -1,0 +1,88 @@
+rules_version = '2';
+
+// Foldify — Firestore Security Rules
+// Deploy:  npx firebase-tools deploy --only firestore:rules   (or paste into Console > Firestore > Rules)
+// Tests:   npm run test:rules   (Firestore emulator, needs Java)
+//
+// Collection `boxes`: one saved box per document.
+//   * only signed-in users can save, and only as themselves
+//   * a box is private by default; the owner may mark it `visibility: 'public'`
+//     so anyone (even signed out) can open it, e.g. from a shared link
+//   * after saving, the owner may only rename it or change its visibility
+//   * everything else in the database is closed
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(data) {
+      return signedIn() && data.userId == request.auth.uid;
+    }
+
+    function isPublic(data) {
+      return data.get('visibility', 'private') == 'public';
+    }
+
+    function validFace(face) {
+      return face is map
+        && face.keys().hasOnly(['color', 'textureUrl', 'aiImageUrl', 'userImageUrl', 'rotation', 'flipX', 'flipY', 'shapes', 'activeShapeIndex'])
+        && face.get('color', '#ffffff') is string && face.get('color', '#ffffff').size() <= 32
+        // pictures are stored as small compressed thumbnails (~10 KB); 120 KB is a generous cap
+        && (face.get('textureUrl', null) == null || (face.textureUrl is string && face.textureUrl.size() <= 120000))
+        && (face.get('aiImageUrl', null) == null || (face.aiImageUrl is string && face.aiImageUrl.size() <= 2048))
+        && (face.get('userImageUrl', null) == null || (face.userImageUrl is string && face.userImageUrl.size() <= 2048))
+        && face.get('rotation', 0) is number
+        && face.get('flipX', false) is bool
+        && face.get('flipY', false) is bool
+        && face.get('shapes', []) is list && face.get('shapes', []).size() <= 50;
+    }
+
+    function validFaces(faces) {
+      return faces is map
+        && faces.keys().hasOnly(['top', 'bottom', 'front', 'back', 'left', 'right'])
+        && faces.keys().hasAll(['top', 'bottom', 'front', 'back', 'left', 'right'])
+        && validFace(faces.top) && validFace(faces.bottom)
+        && validFace(faces.front) && validFace(faces.back)
+        && validFace(faces.left) && validFace(faces.right);
+    }
+
+    function validTitle(t) {
+      return t is string && t.size() >= 1 && t.size() <= 80;
+    }
+
+    function validNewBox(d) {
+      return d.keys().hasOnly(['userId', 'facesConfig', 'activeNetId', 'netFlipX', 'netFlipY', 'netRotation', 'schemaVersion', 'createdAt', 'title', 'visibility'])
+        && d.keys().hasAll(['userId', 'facesConfig', 'activeNetId', 'createdAt', 'title'])
+        && d.userId == request.auth.uid
+        && validFaces(d.facesConfig)
+        && d.activeNetId is int && d.activeNetId >= 0 && d.activeNetId <= 10
+        && d.get('netFlipX', false) is bool
+        && d.get('netFlipY', false) is bool
+        && d.get('netRotation', 0) is int && d.get('netRotation', 0) >= 0 && d.get('netRotation', 0) <= 3
+        && d.get('schemaVersion', 1) is int
+        && d.createdAt == request.time            // server timestamp, can't be back-dated
+        && validTitle(d.title)
+        && d.get('visibility', 'private') in ['private', 'public'];
+    }
+
+    match /boxes/{boxId} {
+      // `get` and `list` both go through `read`. A list query must be limited to
+      // the caller's own boxes (where userId == uid) or to public boxes.
+      allow read: if isOwner(resource.data) || isPublic(resource.data);
+
+      allow create: if signedIn() && validNewBox(request.resource.data);
+
+      allow update: if isOwner(resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'visibility'])
+        && validTitle(request.resource.data.title)
+        && request.resource.data.get('visibility', 'private') in ['private', 'public'];
+
+      allow delete: if isOwner(resource.data);
+    }
+
+    // Anything not matched above is denied.
+  }
+}
