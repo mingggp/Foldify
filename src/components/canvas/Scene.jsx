@@ -1,5 +1,5 @@
-import React, { useRef, useEffect, useState, useCallback } from "react";
-import { Canvas, useThree, useFrame } from "@react-three/fiber";
+import { useEffect } from "react";
+import { Canvas, useThree } from "@react-three/fiber";
 import { Environment, Grid, Lightformer } from "@react-three/drei";
 import * as THREE from 'three';
 import { analyzeNetImage } from "../../utils/SmartNetAnalyzer";
@@ -18,28 +18,62 @@ function TestBridge() {
   return null;
 }
 
-// Simple helper that lives inside R3F context and can directly access gl
-function SnapshotCapture({ onCapture }) {
-  const { gl } = useThree();
-  const pendingCapture = useRef(false);
+/**
+ * Export renderer: on an "export-render" request, draws the box once with an export
+ * camera into the canvas at the export size, grabs it, and puts everything back — all in
+ * one synchronous step, so nothing ever flashes on screen. Selection highlights are
+ * hidden; grid / floor shadow / background follow the export options.
+ */
+const HOME_DIR = new THREE.Vector3(1, 1, 1).normalize();
+const TARGET = new THREE.Vector3(0, 1, 0);
 
+function ExportRenderer() {
+  const { gl, scene, camera } = useThree();
   useEffect(() => {
-    const handleCapture = () => {
-      pendingCapture.current = true;
+    const onRender = (e) => {
+      const { id, width, height, zoom = 1, view = "current", grid = false, shadow = true, background = "transparent" } = e.detail || {};
+      const cam = camera.clone();
+      if (view === "iso") {
+        cam.position.copy(TARGET).addScaledVector(HOME_DIR, 13.5);
+        cam.up.set(0, 1, 0);
+        cam.lookAt(TARGET);
+      }
+      cam.aspect = width / height;
+      cam.zoom = zoom;
+      cam.updateProjectionMatrix();
+      cam.updateMatrixWorld(true);
+
+      const hidden = [];
+      scene.traverse((o) => {
+        const hide =
+          o.name === "selection-glow" || o.name === "highlight-edge" ||
+          (o.name === "floor-grid" && !grid) || (o.name === "floor-shadow" && !shadow);
+        if (hide && o.visible) { o.visible = false; hidden.push(o); }
+      });
+      const prevSize = gl.getSize(new THREE.Vector2());
+      const prevRatio = gl.getPixelRatio();
+      const prevClear = gl.getClearColor(new THREE.Color());
+      const prevAlpha = gl.getClearAlpha();
+      let url = null;
+      try {
+        gl.setPixelRatio(1);
+        gl.setSize(width, height, false);
+        gl.setClearColor(0xffffff, background === "white" ? 1 : 0);
+        gl.clear();
+        gl.render(scene, cam);
+        url = gl.domElement.toDataURL("image/png");
+      } finally {
+        hidden.forEach((o) => { o.visible = true; });
+        gl.setPixelRatio(prevRatio);
+        gl.setSize(prevSize.x, prevSize.y, false);
+        gl.setClearColor(prevClear, prevAlpha);
+        gl.render(scene, camera);
+      }
+      window.dispatchEvent(new CustomEvent("export-rendered", { detail: { id, url } }));
     };
-    window.addEventListener('trigger-snapshot-frame', handleCapture);
-    return () => window.removeEventListener('trigger-snapshot-frame', handleCapture);
-  }, []);
-
-  useFrame(() => {
-    if (pendingCapture.current) {
-      pendingCapture.current = false;
-      // R3F has just rendered this frame — grab the buffer now
-      const image = gl.domElement.toDataURL("image/png");
-      onCapture(image);
-    }
-  });
-
+    window.addEventListener("export-render", onRender);
+    return () => window.removeEventListener("export-render", onRender);
+  }, [gl, scene, camera]);
   return null;
 }
 
@@ -135,40 +169,10 @@ function CanvasDropHandler({ setFacesConfig, setActiveNetId, setNetFlipX, setNet
 }
 
 export default function Scene({ children, theme, showGrid, showShadows, isAutoRotate, setFacesConfig, setActiveNetId, setNetFlipX, setNetFlipY, setNetRotation }) {
-  const [hideHighlights, setHideHighlights] = useState(false);
-
-  // Listen for trigger-snapshot: hide highlights, wait a tick for React render, fire capture, restore
-  useEffect(() => {
-    const handleTrigger = () => {
-      setHideHighlights(true);
-      // After React renders with hideHighlights=true (no pink edges),
-      // dispatch trigger-snapshot-frame so SnapshotCapture grabs it
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          window.dispatchEvent(new Event('trigger-snapshot-frame'));
-        });
-      });
-    };
-    window.addEventListener('trigger-snapshot', handleTrigger);
-    return () => window.removeEventListener('trigger-snapshot', handleTrigger);
-  }, []);
-
-  const handleCaptured = useCallback((image) => {
-    setHideHighlights(false);
-    window.dispatchEvent(new CustomEvent('snapshot-ready', { detail: image }));
-  }, []);
-
-  // Clone children and inject hideHighlights prop
-  const childrenWithProp = typeof children === 'object'
-    ? React.Children.map(children, child =>
-        child ? React.cloneElement(child, { hideHighlights }) : child
-      )
-    : children;
   return (
     <div className="w-full h-full">
-      <Canvas camera={{ position: [4, 11.5, 7.5], fov: 45 }} shadows={showShadows} gl={{ preserveDrawingBuffer: true, alpha: true }}>
-        {/* Helper to capture reliable snapshots without UI */}
-        <SnapshotCapture onCapture={handleCaptured} />
+      <Canvas camera={{ position: [7.8, 8.8, 7.8], fov: 45 }} shadows={showShadows} gl={{ preserveDrawingBuffer: true, alpha: true }}>
+        <ExportRenderer />
         {import.meta.env.DEV && <TestBridge />}
         
         {/* No scene background: the canvas is transparent so the page's teal stage shows through
@@ -202,23 +206,24 @@ export default function Scene({ children, theme, showGrid, showShadows, isAutoRo
         )}
 
         {/* Scene Objects */}
-        {childrenWithProp}
+        {children}
 
         {/* Floor and Grid */}
         {showGrid && (
           <Grid
+            name="floor-grid"
             infiniteGrid
             fadeDistance={40}
             sectionThickness={1.2}
             cellThickness={0.8}
-            sectionColor={theme === 'dark' ? "#24555c" : "#8fc3c2"}
-            cellColor={theme === 'dark' ? "#173c42" : "#c3dedd"}
+            sectionColor={theme === 'dark' ? "#30383b" : "#8fc3c2"}
+            cellColor={theme === 'dark' ? "#1d2225" : "#c3dedd"}
             position={[0, -0.02, 0]}
           />
         )}
 
         {showShadows && (
-          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
+          <mesh name="floor-shadow" rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
             <planeGeometry args={[100, 100]} />
             <shadowMaterial transparent opacity={theme === 'dark' ? 0.45 : 0.22} color={theme === 'dark' ? '#000000' : '#0b4a50'} />
           </mesh>

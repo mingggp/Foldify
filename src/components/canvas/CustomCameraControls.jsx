@@ -25,7 +25,7 @@ export default function CustomCameraControls({
   rollSensitivity = 1.0,
   isAutoRotate = false,
   autoRotateSpeed = 2.0,
-  home = [4, 11.5, 7.5],
+  home = [7.8, 8.8, 7.8], // isometric: 45° round, ~35° down
 }) {
   const { camera, gl } = useThree();
   const targetV = useRef(new THREE.Vector3(...target));

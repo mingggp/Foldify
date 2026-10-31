@@ -32,21 +32,22 @@
 }
 
 .dark {
-  --paper: #071a1e;
-  --surface: #0f2a30;
-  --surface-2: #133339;
-  --ink: #e2f3f1;
-  --muted: #8db0b2;
-  --line: #1e4248;
+  /* black with teal accents */
+  --paper: #050607;
+  --surface: #121416;
+  --surface-2: #1a1d20;
+  --ink: #eef3f3;
+  --muted: #9aa5a8;
+  --line: #2a2f33;
   --brand-ink: #4fd3cf;
   --good: #34d399;
   --bad: #f87171;
-  --glass: rgb(15 42 48 / 0.72);
-  --glass-line: rgb(120 220 215 / 0.12);
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 16px 40px -12px rgb(0 0 0 / 0.6);
-  --stage: radial-gradient(1200px 700px at 12% -10%, rgb(0 213 201 / 0.16), transparent 60%),
-           radial-gradient(900px 600px at 110% 110%, rgb(40 161 171 / 0.18), transparent 60%),
-           #06161a;
+  --glass: rgb(18 20 22 / 0.8);
+  --glass-line: rgb(255 255 255 / 0.08);
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 16px 40px -12px rgb(0 0 0 / 0.8);
+  --stage: radial-gradient(1100px 650px at 12% -10%, rgb(0 213 201 / 0.10), transparent 60%),
+           radial-gradient(900px 600px at 110% 110%, rgb(40 161 171 / 0.10), transparent 60%),
+           #050607;
   color-scheme: dark;
 }
 
@@ -210,11 +211,84 @@ input, textarea, select, .scroll-area { touch-action: auto; }
   box-shadow: 0 4px 10px -2px rgb(0 120 110 / 0.45);
 }
 
-/* small ordinary sliders */
-input[type=range].mini {
-  accent-color: var(--mint);
-  height: 1.5rem;
+/* small sliders (components/ui/Modal.jsx <Range>) */
+input[type=range].range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 1.75rem;
+  background: transparent;
+  cursor: pointer;
+  --p: 50%;
 }
+input[type=range].range::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--mint) var(--p), var(--line) var(--p));
+}
+input[type=range].range::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--mint) var(--p), var(--line) var(--p));
+}
+input[type=range].range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  margin-top: -8px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 3px solid var(--mint);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.25);
+  transition: transform 0.15s;
+}
+input[type=range].range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 3px solid var(--mint);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.25);
+}
+input[type=range].range:active::-webkit-slider-thumb { transform: scale(1.15); }
+
+/* ---------- moving gradient ring (Smart Scan card, selected face chip) ---------- */
+@property --ring-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+.ring-anim::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: var(--ring-w, 2px);
+  background: conic-gradient(from var(--ring-angle), #00d5c9, #28a1ab, #ffb238, #00c8b5, #00d5c9);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: ring-spin 4s linear infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+@keyframes ring-spin { to { --ring-angle: 360deg; } }
+
+.scan-card {
+  --ring-w: 2.5px;
+  padding: 2.5px;
+  box-shadow: 0 12px 28px -14px rgb(0 180 165 / 0.8);
+}
+.scan-card > button { border-radius: 14px; }
+/* a soft light sweeping across the card every few seconds */
+.scan-shine {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgb(0 213 201 / 0.16) 50%, transparent 65%);
+  transform: translateX(-100%);
+  animation: scan-shine 3.6s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes scan-shine { 0%, 55% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
 
 /* ---------- motion ---------- */
 @keyframes rise {

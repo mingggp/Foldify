@@ -32,7 +32,7 @@ const T = (id, d, size = [360, 360], extra = {}) => ({ id, d, size, ...extra });
 
 export const SHAPE_GROUPS = [
   {
-    id: "basic",
+    id: "shapes",
     items: [
       T("square", "M0 0H100V100H0Z"),
       T("rounded", "M18 0H82A18 18 0 0 1 100 18V82A18 18 0 0 1 82 100H18A18 18 0 0 1 0 82V18A18 18 0 0 1 18 0Z"),
@@ -58,6 +58,23 @@ export const SHAPE_GROUPS = [
       T("heart", "M50 96L12 58C-6 40 2 8 28 8C40 8 47 15 50 22C53 15 60 8 72 8C98 8 106 40 88 58Z"),
       T("hexagon", "M25 3H75L100 50L75 97H25L0 50Z", [400, 346]),
       T("pentagon", "M50 0L100 38L81 100H19L0 38Z"),
+      T("arrow-right", "M0 30H55V0L100 50L55 100V70H0Z", [420, 300]),
+      T("arrow-left", "M100 30H45V0L0 50L45 100V70H100Z", [420, 300]),
+      T("arrow-up", "M30 100V45H0L50 0L100 45H70V100Z", [300, 420]),
+      T("arrow-down", "M30 0V55H0L50 100L100 55H70V0Z", [300, 420]),
+      T("arrow-both", "M0 50L30 15V35H70V15L100 50L70 85V65H30V85Z", [440, 260]),
+      T("arrow-updown", "M50 0L85 30H65V70H85L50 100L15 70H35V30H15Z", [260, 440]),
+      T("tag", "M0 0H75L100 50L75 100H0Z", [420, 220]),
+      T("chevron", "M0 0H75L100 50L75 100H0L25 50Z", [420, 220]),
+      T("arrow-thin", "M0 50L45 8L35 38H100V62H35L45 92Z", [420, 300]),
+      T("quatrefoil", "M25 25A25 25 0 0 1 75 25A25 25 0 0 1 75 75A25 25 0 0 1 25 75A25 25 0 0 1 25 25Z"),
+      T("quatrefoil-hole", "M25 25A25 25 0 0 1 75 25A25 25 0 0 1 75 75A25 25 0 0 1 25 75A25 25 0 0 1 25 25ZM38 38V62H62V38Z", [360, 360], { evenodd: true }),
+      T("sparkle", "M50 0Q56 44 100 50Q56 56 50 100Q44 56 0 50Q44 44 50 0Z"),
+      T("crescent", "M62 0A50 50 0 1 0 62 100A40 50 0 1 1 62 0Z", [300, 360]),
+      T("cut-corner", "M40 0H100V55L58 100H0V45Z"),
+      T("pill", "M25 0H75A25 25 0 0 1 75 50H25A25 25 0 0 1 25 0ZM25 50H75A25 25 0 0 1 75 100H25A25 25 0 0 1 25 50Z", [400, 320]),
+      T("burst", star(8, 50, 34, -90)),
+      T("drop", "M50 0C50 0 90 45 90 66A40 34 0 0 1 10 66C10 45 50 0 50 0Z", [300, 380]),
     ],
   },
   {
@@ -68,33 +85,6 @@ export const SHAPE_GROUPS = [
       { id: "line-arrow", line: "arrow", size: [480, 0] },
       { id: "line-double", line: "double", size: [480, 0] },
       { id: "line-ends", line: "ends", size: [480, 0] },
-    ],
-  },
-  {
-    id: "arrows",
-    items: [
-      T("arrow-right", "M0 30H55V0L100 50L55 100V70H0Z", [420, 300]),
-      T("arrow-left", "M100 30H45V0L0 50L45 100V70H100Z", [420, 300]),
-      T("arrow-up", "M30 100V45H0L50 0L100 45H70V100Z", [300, 420]),
-      T("arrow-down", "M30 0V55H0L50 100L100 55H70V0Z", [300, 420]),
-      T("arrow-both", "M0 50L30 15V35H70V15L100 50L70 85V65H30V85Z", [440, 260]),
-      T("arrow-updown", "M50 0L85 30H65V70H85L50 100L15 70H35V30H15Z", [260, 440]),
-      T("tag", "M0 0H75L100 50L75 100H0Z", [420, 220]),
-      T("chevron", "M0 0H75L100 50L75 100H0L25 50Z", [420, 220]),
-      T("arrow-thin", "M0 50L45 8L35 38H100V62H35L45 92Z", [420, 300]),
-    ],
-  },
-  {
-    id: "free",
-    items: [
-      T("quatrefoil", "M25 25A25 25 0 0 1 75 25A25 25 0 0 1 75 75A25 25 0 0 1 25 75A25 25 0 0 1 25 25Z"),
-      T("quatrefoil-hole", "M25 25A25 25 0 0 1 75 25A25 25 0 0 1 75 75A25 25 0 0 1 25 75A25 25 0 0 1 25 25ZM38 38V62H62V38Z", [360, 360], { evenodd: true }),
-      T("sparkle", "M50 0Q56 44 100 50Q56 56 50 100Q44 56 0 50Q44 44 50 0Z"),
-      T("crescent", "M62 0A50 50 0 1 0 62 100A40 50 0 1 1 62 0Z", [300, 360]),
-      T("cut-corner", "M40 0H100V55L58 100H0V45Z"),
-      T("pill", "M25 0H75A25 25 0 0 1 75 50H25A25 25 0 0 1 25 0ZM25 50H75A25 25 0 0 1 75 100H25A25 25 0 0 1 25 50Z", [400, 320]),
-      T("burst", star(8, 50, 34, -90)),
-      T("drop", "M50 0C50 0 90 45 90 66A40 34 0 0 1 10 66C10 45 50 0 50 0Z", [300, 380]),
     ],
   },
 ];

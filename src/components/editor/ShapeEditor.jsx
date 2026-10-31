@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Shapes, MousePointer2, PenTool, Grid3x3, Undo2, Redo2, BringToFront, SendToBack, CopyPlus, FlipHorizontal, Trash2, Check, X, Eraser } from "lucide-react";
-import Modal, { Segmented } from "../ui/Modal";
+import Modal, { Segmented, Range } from "../ui/Modal";
 import { useLang } from "../../contexts/LanguageContext";
 import {
   FACE_SIZE, SHAPE_GROUPS, SHAPE_NAMES, drawShapes, hitShape, isLine, lineEnds, lineFromEnds, makePathShape, makeShape,
@@ -8,7 +8,7 @@ import {
 } from "../../lib/shapes";
 
 const FACE_ORDER = ["top", "front", "left", "right", "back", "bottom"];
-const COLORS = ["#28a1ab", "#00c8b5", "#00d5c9", "#0e3238", "#ffffff", "#ffb238", "#ff7a59", "#e5484d", "#f7a8c4", "#8b7cf6", "#4f8ef7", "#9be15d", "#94a3b8"];
+const COLORS = ["#0e3238", "#ffffff", "#28a1ab", "#00c8b5", "#ffb238", "#e5484d", "#f7a8c4", "#8b7cf6", "#4f8ef7"];
 const GRID = 64; // snap step in face pixels (1/16 of a face)
 const SNAP_DIST = 30; // how close (face px) a point must be to snap onto another corner
 const MIN = 16;
@@ -62,7 +62,7 @@ export default function ShapeEditor({ faceId, facesConfig, setFacesConfig, onPic
   const [hover, setHover] = useState(null);
   const [snapOn, setSnapOn] = useState(true);
   const [color, setColor] = useState("#28a1ab");
-  const [group, setGroup] = useState("basic");
+  const [group, setGroup] = useState("shapes");
   if (synced.faceId !== faceId || synced.shapes !== face.shapes) {
     setSynced({ faceId, shapes: face.shapes });
     setDraft(normalizeAll(face.shapes));
@@ -409,7 +409,6 @@ export default function ShapeEditor({ faceId, facesConfig, setFacesConfig, onPic
             </svg>
           </div>
 
-          {face.rotation ? <p className="hint text-center">{t("editorRotatedNote").replace("{deg}", face.rotation)}</p> : null}
 
           {/* contextual bar */}
           {tool === "pen" ? (
@@ -424,7 +423,7 @@ export default function ShapeEditor({ faceId, facesConfig, setFacesConfig, onPic
             </div>
           ) : (
             <div className="rounded-2xl border border-line bg-surface-2 p-3 space-y-3">
-              <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label={t("fillColor")}>
+              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide" role="radiogroup" aria-label={t("fillColor")}>
                 {COLORS.map((c) => (
                   <button
                     key={c}
@@ -432,11 +431,11 @@ export default function ShapeEditor({ faceId, facesConfig, setFacesConfig, onPic
                     aria-checked={(selected?.fill || color) === c}
                     aria-label={c}
                     onClick={() => pickColor(c)}
-                    className={`w-8 h-8 rounded-lg border ${(selected?.fill || color) === c ? "ring-2 ring-mint ring-offset-2 ring-offset-surface-2 border-transparent" : "border-line"}`}
+                    className={`w-8 h-8 shrink-0 rounded-lg border ${(selected?.fill || color) === c ? "ring-2 ring-mint ring-offset-2 ring-offset-surface-2 border-transparent" : "border-line"}`}
                     style={{ background: c }}
                   />
                 ))}
-                <label className="w-8 h-8 rounded-lg border border-line relative overflow-hidden cursor-pointer" style={{ background: "conic-gradient(#ff7a59,#ffb238,#9be15d,#00c8b5,#4f8ef7,#8b7cf6,#f7a8c4,#ff7a59)" }} title={t("customColor")}>
+                <label className="w-8 h-8 shrink-0 rounded-lg border border-line relative overflow-hidden cursor-pointer" style={{ background: "conic-gradient(#ff7a59,#ffb238,#9be15d,#00c8b5,#4f8ef7,#8b7cf6,#f7a8c4,#ff7a59)" }} title={t("customColor")}>
                   <input type="color" value={selected?.fill || color} onChange={(e) => pickColor(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer" aria-label={t("customColor")} />
                 </label>
               </div>
@@ -447,13 +446,13 @@ export default function ShapeEditor({ faceId, facesConfig, setFacesConfig, onPic
                   {lineStroke ? (
                     <label className="flex items-center gap-2 text-xs text-muted">
                       {t("thickness")}
-                      <input type="range" className="mini w-28" min="4" max="60" step="1" value={selected.strokeWidth || 14} onChange={(e) => updateSelected({ strokeWidth: +e.target.value }, false)} onPointerUp={() => commit(draft)} />
+                      <Range className="w-32" min={4} max={60} step={1} value={selected.strokeWidth || 14} onChange={(v) => updateSelected({ strokeWidth: v }, false)} onPointerUp={() => commit(draft)} aria-label={t("thickness")} />
                     </label>
                   ) : (
                     <label className="flex items-center gap-2 text-xs text-muted">
                       <input type="checkbox" className="accent-[var(--mint)] w-4 h-4" checked={!!outlineOn} onChange={(e) => updateSelected(e.target.checked ? { stroke: "#0e3238", strokeWidth: selected.strokeWidth || 12 } : { stroke: null })} />
                       {t("outline")}
-                      {outlineOn && <input type="range" className="mini w-24" min="2" max="48" step="1" value={selected.strokeWidth || 12} onChange={(e) => updateSelected({ strokeWidth: +e.target.value }, false)} onPointerUp={() => commit(draft)} aria-label={t("thickness")} />}
+                      {outlineOn && <Range className="w-28" min={2} max={48} step={1} value={selected.strokeWidth || 12} onChange={(v) => updateSelected({ strokeWidth: v }, false)} onPointerUp={() => commit(draft)} aria-label={t("thickness")} />}
                     </label>
                   )}
                   <div className="flex">

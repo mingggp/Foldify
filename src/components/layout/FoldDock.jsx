@@ -36,17 +36,17 @@ export default function FoldDock({ progress, onChange, onPlay }) {
   const pct = Math.round(progress * 100);
   const folding = progress < 0.5;
   return (
-    <div className="glass rounded-[22px] pl-2 pr-4 py-2 flex items-center gap-3 w-[min(560px,calc(100vw-2rem))]" data-testid="fold-dock">
+    <div className="glass rounded-[22px] pl-2 pr-4 py-2 flex items-center gap-3 w-[min(480px,calc(100vw-2rem))]" data-testid="fold-dock">
       <button
         onClick={onPlay}
-        className="btn btn-primary h-12 px-4 rounded-2xl text-[15px] shrink-0"
+        className="btn btn-primary btn-icon w-11 h-11 rounded-full shrink-0"
         data-testid="fold-play"
         aria-label={folding ? t("foldUp") : t("unfold")}
+        title={folding ? t("foldUp") : t("unfold")}
       >
-        <svg viewBox="0 0 24 24" className={`w-5 h-5 transition-transform duration-500 ${folding ? "" : "rotate-180"}`} fill="currentColor" aria-hidden="true">
+        <svg viewBox="0 0 24 24" className={`w-5 h-5 transition-transform duration-500 ${folding ? "translate-x-px" : "rotate-180 -translate-x-px"}`} fill="currentColor" aria-hidden="true">
           <path d="M7 4.5v15l12-7.5z" />
         </svg>
-        <span className="hidden sm:inline min-w-[4.5em] text-left">{folding ? t("foldUp") : t("unfold")}</span>
       </button>
 
       <span className={`transition-colors ${progress < 0.98 ? "text-brand-ink" : "text-muted"}`} title={t("net2d")}>

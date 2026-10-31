@@ -1,12 +1,14 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
+import { useFrame } from "@react-three/fiber";
 import { Edges } from "@react-three/drei";
 import { VALID_CUBE_NETS } from "./netsConfig";
 import { drawShapes } from "../../lib/shapes";
 import { hingeFor, mapEdge, normalizeTransform, resolveFaceIds, rootPlacement } from "../../lib/netGeometry";
 
-// Paint one face (colour, picture, stickers, selection outline) into its canvas texture.
-function paintFace(faceCanvas, texture, { color, imgObj, shapes, rotation, flipX, flipY, isSelected }) {
+// Paint one face (colour, picture, shapes) into its canvas texture. Selection is NOT painted
+// here (that meant re-uploading a 1024px texture on every click); see SelectionGlow.
+function paintFace(faceCanvas, texture, { color, imgObj, shapes, rotation, flipX, flipY }) {
   const ctx = faceCanvas.getContext('2d');
   
   ctx.clearRect(0, 0, 1024, 1024);
@@ -18,12 +20,6 @@ function paintFace(faceCanvas, texture, { color, imgObj, shapes, rotation, flipX
   }
 
   drawShapes(ctx, shapes);
-
-  if (isSelected) {
-    ctx.lineWidth = 40; // Super thick visible border
-    ctx.strokeStyle = '#ffb238'; // spark (selected face)
-    ctx.strokeRect(20, 20, 984, 984); // Inset slightly so thick lines stay inside UV
-  }
 
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.center.set(0.5, 0.5);
@@ -79,15 +75,15 @@ function FaceMaterial({ config, showShadows, isHovered, isSelected }) {
   }, [textureUrl]);
 
   useEffect(() => {
-    paintFace(faceCanvas, texture, { color, imgObj, shapes, rotation: config.rotation, flipX: config.flipX, flipY: config.flipY, isSelected });
-  }, [color, imgObj, shapes, config.rotation, config.flipX, config.flipY, isSelected, faceCanvas, texture]);
+    paintFace(faceCanvas, texture, { color, imgObj, shapes, rotation: config.rotation, flipX: config.flipX, flipY: config.flipY });
+  }, [color, imgObj, shapes, config.rotation, config.flipX, config.flipY, faceCanvas, texture]);
 
   const Material = showShadows ? "meshStandardMaterial" : "meshBasicMaterial";
 
   // Use a noticeable emissive color for selected (e.g. Vivid Pink glow), and subtle for hovered
-  const emissiveColor = isSelected ? "#3d2600" : isHovered ? "#0d3330" : "#000000";
+  const emissiveColor = isHovered && !isSelected ? "#0d3330" : "#000000";
   // For unlit mode (BasicMaterial), we change the base color tint directly
-  const basicColor = isSelected ? "#ffe6b8" : isHovered ? "#d9f6f2" : "#ffffff";
+  const basicColor = isHovered && !isSelected ? "#d9f6f2" : "#ffffff";
 
   const hoverProps = showShadows ? { emissive: emissiveColor } : { color: basicColor };
 
@@ -103,6 +99,58 @@ function FaceMaterial({ config, showShadows, isHovered, isSelected }) {
       roughness={0.3}
       {...hoverProps}
     />
+  );
+}
+
+// Selected face: a slowly travelling teal→amber gradient around the border plus a soft
+// breathing glow, drawn by a tiny shader on top of the face (no texture repaint).
+const glowVertex = `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+const glowFragment = `
+  uniform float uTime;
+  varying vec2 vUv;
+  vec3 ramp(float t) {
+    vec3 a = vec3(0.0, 0.835, 0.788);   // #00d5c9
+    vec3 b = vec3(0.157, 0.631, 0.671); // #28a1ab
+    vec3 c = vec3(1.0, 0.698, 0.22);    // #ffb238
+    t = fract(t) * 3.0;
+    if (t < 1.0) return mix(a, b, smoothstep(0.0, 1.0, t));
+    if (t < 2.0) return mix(b, c, smoothstep(1.0, 2.0, t));
+    return mix(c, a, smoothstep(2.0, 3.0, t));
+  }
+  void main() {
+    float e = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
+    float ang = atan(vUv.y - 0.5, vUv.x - 0.5) / 6.2831853 + 0.5;
+    vec3 col = ramp(ang - uTime * 0.12);
+    float border = 1.0 - smoothstep(0.045, 0.06, e);
+    float glow = (1.0 - smoothstep(0.0, 0.3, e)) * (0.22 + 0.12 * sin(uTime * 2.2));
+    gl_FragColor = vec4(col, max(border, glow));
+  }
+`;
+function SelectionGlow() {
+  const ref = useRef(null);
+  useFrame((state) => {
+    if (ref.current) ref.current.uniforms.uTime.value = state.clock.elapsedTime;
+  });
+  return (
+    <mesh name="selection-glow" position={[0, 0, 0.004]} raycast={noRaycast} renderOrder={3}>
+      <planeGeometry args={[2, 2]} />
+      <shaderMaterial
+        ref={ref}
+        args={[{ uniforms: { uTime: { value: 0 } }, vertexShader: glowVertex, fragmentShader: glowFragment }]}
+        transparent
+        depthWrite={false}
+        polygonOffset
+        polygonOffsetFactor={-2}
+        polygonOffsetUnits={-2}
+        toneMapped={false}
+      />
+    </mesh>
   );
 }
 
@@ -156,14 +204,9 @@ function FaceNode({ node, path, edge, angle, transform, faceIds, facesConfig, ge
   const isSelected = selectedFace === faceId;
   const isHovered = hoveredFace === faceId;
 
-  // Only show edges when NOT capturing a snapshot
-  const drawEdges = !hideHighlights && (isSelected || isHovered) && (
-    <Edges
-      name="highlight-edge"
-      scale={isSelected ? 1.02 : 1.01}
-      color={isSelected ? "#ffb238" : "#00c8b5"}
-      threshold={15}
-    />
+  // Hover outline (not while capturing a snapshot); the selected face gets SelectionGlow.
+  const drawEdges = !hideHighlights && isHovered && !isSelected && (
+    <Edges name="highlight-edge" scale={1.01} color="#00c8b5" threshold={15} />
   );
 
   const userData = { faceId, path };
@@ -176,6 +219,7 @@ function FaceNode({ node, path, edge, angle, transform, faceIds, facesConfig, ge
         <planeGeometry args={[2, 2]} />
         <FaceMaterial config={facesConfig[faceId]} showShadows={showShadows} isHovered={isHovered} isSelected={isSelected} />
         {drawEdges}
+        {isSelected && !hideHighlights && <SelectionGlow />}
         {showLabels && <FaceLabel text={faceId.toUpperCase()} />}
       </mesh>
       {/* 3. Inside of the paper */}

@@ -64,7 +64,12 @@ The **Share / QR** button builds a link (and a downloadable QR code) for the net
 
 `labels` go on the squares in reading order (left→right, top→bottom) of the net as shown; Thai works (`labels=กขคงจฉ`), use commas for longer labels. Full description in `src/lib/shareLink.js`. Every link carries `v=` so printed QR codes keep working if the format changes later.
 
-**Guess before folding**: asks "which face is opposite X?", folds the box to reveal the answer, keeps score; "New net" picks a random net and placement for self-practice. On a design without labels it practises on a lettered net and restores the design afterwards.
+**Guess before folding** makes an exam-style question from the box on screen (`src/lib/cubeQuiz.js`, `components/quiz/QuizModal.jsx`):
+- *Net → box*: the net is the question, the 5 choices are folded boxes (three faces seen, isometric).
+- *Box → net*: the box seen from two sides is the question, the 5 choices are nets (five different net shapes).
+- Ask for *the right one* (1 right, 4 wrong) or *the odd one out* (4 right, 1 wrong), or mix.
+- Wrong choices are made by turning a face, swapping two faces, or putting two opposite faces side by side — and are only used if they really *look* different from every correct view (faces are compared by small pixel signatures, so plain colours or symmetric pictures can't make a "wrong" answer that is actually right). If the box's faces are too alike, a lettered practice net is used instead.
+- Tests compare the 2D quiz pictures with the real 3D box (`tests/e2e/cubeQuiz.spec.js`).
 
 ## 🎨 Look and feel
 
@@ -73,6 +78,8 @@ The **Share / QR** button builds a link (and a downloadable QR code) for the net
 - Light / dark / auto theme in Settings (remembered per browser). Tools panel docks beside the 3D view from 1024 px wide (iPad landscape, PC) and slides in from the side on narrower screens.
 - The previous interface is kept on the `legacy/ui-v1` branch.
 - Logo ideas: `design/logo-proposals/board.png`.
+- **Save a picture** (download button): the preview is exactly the exported PNG (2048 px), with view (isometric / as on screen), shape, zoom, white or transparent background, floor grid and shadow options. Selection outlines are never included.
+- Right-click menus are switched off (except in text fields).
 
 ## ✏️ Shape editor
 

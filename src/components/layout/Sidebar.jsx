@@ -1,8 +1,9 @@
 import { Download, Settings, X, ImagePlus, Trash2, FlipHorizontal, FlipVertical, RotateCcw, RotateCw, Undo2, Redo2, Shapes, Loader2, Save, LogOut, LogIn, Images, ScanLine, Copy, ClipboardPaste, Shuffle, Eraser, Plus } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import NetSelector from "../NetSelector";
 import Logo from "../ui/Logo";
-import { Segmented } from "../ui/Modal";
+import ScanHelp from "./ScanHelp";
+import { Segmented, Range } from "../ui/Modal";
 import { useAuth } from "../../contexts/AuthContext";
 import { saveBoxConfig } from "../../services/db";
 import { useLang } from "../../contexts/LanguageContext";
@@ -10,7 +11,7 @@ import { analyzeNetImage } from "../../utils/SmartNetAnalyzer";
 import { useToast } from "../../contexts/ToastContext";
 
 const FACE_ORDER = ["top", "front", "left", "right", "back", "bottom"];
-const SWATCHES = ["#ffffff", "#28a1ab", "#00c8b5", "#00d5c9", "#ffb238", "#ff7a59", "#f7a8c4", "#8b7cf6", "#4f8ef7", "#9be15d", "#94a3b8", "#1e293b"];
+const SWATCHES = ["#ffffff", "#28a1ab", "#00c8b5", "#ffb238", "#ff7a59", "#f7a8c4", "#8b7cf6"];
 
 function IconButton({ label, children, ...rest }) {
   return (
@@ -20,7 +21,7 @@ function IconButton({ label, children, ...rest }) {
   );
 }
 
-export default function Sidebar({ closeSidebar, quizOpen, onOpenShapeEditor, facesConfig, setFacesConfig, undoFaces, redoFaces, canUndo, canRedo, selectedFace, setSelectedFace, activeNetId, setActiveNetId, netFlipX, setNetFlipX, netFlipY, setNetFlipY, netRotation = 0, setNetRotation, setShowAuthModal, setShowGalleryModal, setShowSettingsModal, setShowExportModal, setExportImageBlob }) {
+export default function Sidebar({ closeSidebar, quizOpen, onOpenShapeEditor, facesConfig, setFacesConfig, undoFaces, redoFaces, canUndo, canRedo, selectedFace, setSelectedFace, activeNetId, setActiveNetId, netFlipX, setNetFlipX, netFlipY, setNetFlipY, netRotation = 0, setNetRotation, setShowAuthModal, setShowGalleryModal, setShowSettingsModal, setShowExportModal }) {
   const [isSaving, setIsSaving] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [clipboardFaceConfig, setClipboardFaceConfig] = useState(null);
@@ -112,15 +113,6 @@ export default function Sidebar({ closeSidebar, quizOpen, onOpenShapeEditor, fac
     updateFaceConfig("textureUrl", URL.createObjectURL(file));
   };
 
-  // snapshot from Scene.jsx -> export dialog
-  useEffect(() => {
-    const onSnapshotReady = (e) => {
-      setExportImageBlob(e.detail);
-      setShowExportModal(true);
-    };
-    window.addEventListener("snapshot-ready", onSnapshotReady);
-    return () => window.removeEventListener("snapshot-ready", onSnapshotReady);
-  }, [setExportImageBlob, setShowExportModal]);
 
   return (
     <aside className="glass max-lg:bg-surface h-full lg:rounded-[26px] flex flex-col overflow-hidden">
@@ -140,25 +132,31 @@ export default function Sidebar({ closeSidebar, quizOpen, onOpenShapeEditor, fac
       </div>
 
       <div className="flex-1 overflow-y-auto scroll-area scrollbar-hide px-4 pb-4 space-y-4">
-        {/* Smart Scan — the most used action, always on top */}
-        <button
-          type="button"
-          onClick={() => smartScanInputRef.current?.click()}
-          disabled={isScanning}
-          data-testid="smart-scan"
-          className="group relative w-full text-left rounded-2xl p-[1.5px] bg-[linear-gradient(135deg,#00d5c9,#28a1ab_55%,#00c8b5)] shadow-[0_10px_24px_-12px_rgb(0_160_150/0.7)] transition-transform active:scale-[0.99]"
-        >
-          <span className="relative flex items-center gap-3 rounded-[15px] bg-surface/95 px-4 py-3.5 overflow-hidden">
-            <span className="relative grid place-items-center w-12 h-12 rounded-xl bg-mint/15 text-brand-ink shrink-0 overflow-hidden">
-              {isScanning ? <Loader2 size={24} className="animate-spin" /> : <ScanLine size={24} />}
-              <span className={`absolute inset-x-1.5 top-1/2 h-0.5 bg-mint rounded-full ${isScanning ? "animate-[scanline_1.1s_ease-in-out_infinite]" : "group-hover:animate-[scanline_1.1s_ease-in-out_infinite]"}`} />
+        {/* Smart Scan — the most used action, always on top, with a moving border to stand out */}
+        <div className="relative ring-anim scan-card rounded-2xl">
+          <button
+            type="button"
+            onClick={() => smartScanInputRef.current?.click()}
+            disabled={isScanning}
+            data-testid="smart-scan"
+            className="group relative w-full text-left rounded-2xl bg-surface overflow-hidden transition-transform active:scale-[0.99]"
+          >
+            <span className="scan-shine" aria-hidden="true" />
+            <span className="relative flex items-center gap-3 px-4 py-3.5 pr-11">
+              <span className="relative grid place-items-center w-12 h-12 rounded-xl bg-mint/15 text-brand-ink shrink-0 overflow-hidden">
+                {isScanning ? <Loader2 size={24} className="animate-spin" /> : <ScanLine size={24} />}
+                <span className={`absolute inset-x-1.5 top-1/2 h-0.5 bg-mint rounded-full ${isScanning ? "animate-[scanline_1.1s_ease-in-out_infinite]" : "animate-[scanline_2.4s_ease-in-out_infinite]"}`} />
+              </span>
+              <span className="min-w-0">
+                <span className="block font-display font-semibold text-[15px] leading-tight">{isScanning ? t("scanBusy") : t("scanTitle")}</span>
+                <span className="block hint mt-1">{t("scanHint")}</span>
+              </span>
             </span>
-            <span className="min-w-0">
-              <span className="block font-display font-semibold text-[15px] leading-tight">{isScanning ? t("scanBusy") : t("scanTitle")}</span>
-              <span className="block hint mt-1">{t("scanHint")}</span>
-            </span>
+          </button>
+          <span className="absolute top-2 right-2">
+            <ScanHelp />
           </span>
-        </button>
+        </div>
         <input type="file" ref={smartScanInputRef} className="hidden" accept="image/*" onChange={handleSmartScan} />
 
         <Segmented
@@ -208,7 +206,7 @@ export default function Sidebar({ closeSidebar, quizOpen, onOpenShapeEditor, fac
                     aria-checked={on}
                     data-testid={`face-chip-${id}`}
                     onClick={() => setSelectedFace(id)}
-                    className={`flex flex-col items-center gap-1 rounded-xl py-1.5 border transition-colors ${on ? "border-spark bg-spark/15" : "border-transparent hover:bg-surface-2"}`}
+                    className={`relative flex flex-col items-center gap-1 rounded-xl py-1.5 border transition-colors ${on ? "ring-anim border-transparent bg-spark/10" : "border-transparent hover:bg-surface-2"}`}
                   >
                     <span className="w-7 h-7 rounded-md border border-line bg-center bg-cover" style={{ backgroundColor: f.color, backgroundImage: f.textureUrl ? `url("${f.textureUrl}")` : undefined }} />
                     <span className="text-[11px] font-semibold leading-none">{t(`face_${id}`)}</span>
@@ -237,7 +235,7 @@ export default function Sidebar({ closeSidebar, quizOpen, onOpenShapeEditor, fac
                 {/* colour */}
                 <div className="space-y-2">
                   <h3 className="section-title">{t("faceColor")}</h3>
-                  <div className="grid grid-cols-7 gap-1.5">
+                  <div className="grid grid-cols-8 gap-1.5">
                     {SWATCHES.map((c) => (
                       <button
                         key={c}
@@ -271,7 +269,7 @@ export default function Sidebar({ closeSidebar, quizOpen, onOpenShapeEditor, fac
                         <button className={`btn btn-soft btn-icon ${face.flipX ? "btn-on" : ""}`} title={t("flipH")} aria-label={t("flipH")} aria-pressed={!!face.flipX} onClick={() => updateFaceConfig("flipX", !face.flipX)}><FlipHorizontal size={16} /></button>
                         <button className={`btn btn-soft btn-icon ${face.flipY ? "btn-on" : ""}`} title={t("flipV")} aria-label={t("flipV")} aria-pressed={!!face.flipY} onClick={() => updateFaceConfig("flipY", !face.flipY)}><FlipVertical size={16} /></button>
                       </div>
-                      <input type="range" min="0" max="359" step="1" value={face.rotation} onChange={(e) => updateFaceConfig("rotation", parseInt(e.target.value))} className="mini w-full" aria-label={t("pictureAngle")} />
+                      <Range min={0} max={359} step={1} value={face.rotation} onChange={(v) => updateFaceConfig("rotation", v)} className="w-full" aria-label={t("pictureAngle")} />
                     </div>
                   ) : (
                     <label className="btn btn-soft w-full h-12 border-dashed cursor-pointer">
@@ -320,7 +318,7 @@ export default function Sidebar({ closeSidebar, quizOpen, onOpenShapeEditor, fac
             <Images size={17} />
             {t("myGallery")}
           </button>
-          <button onClick={() => window.dispatchEvent(new CustomEvent("trigger-snapshot"))} className="btn btn-soft btn-icon" title={t("exportImage")} aria-label={t("exportImage")}>
+          <button onClick={() => setShowExportModal(true)} data-testid="open-export" className="btn btn-soft btn-icon" title={t("exportImage")} aria-label={t("exportImage")}>
             <Download size={17} />
           </button>
         </div>
