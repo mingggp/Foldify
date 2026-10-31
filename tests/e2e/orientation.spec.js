@@ -6,7 +6,7 @@
 // paper (picture-up = camera-up), and check the corners are where they belong.
 // A mirrored face would show blue top-left, or nothing at all (back side culled).
 
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures.js'
 import { openApp, installProbe, setAllFaceTextures, settle } from './helpers.js'
 
 const NETS = 11

@@ -9,7 +9,7 @@
 //   * folded (100%): same box as the ideal one up to turning it in your hands —
 //     a mirror image is NOT accepted.
 
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures.js'
 import { openApp, installProbe } from './helpers.js'
 
 test.use({ viewport: { width: 640, height: 400 } })

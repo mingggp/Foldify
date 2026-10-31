@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures.js'
 import { installProbe, settle } from './helpers.js'
 
 test.use({ viewport: { width: 1366, height: 1024 } }) // iPad Pro landscape
