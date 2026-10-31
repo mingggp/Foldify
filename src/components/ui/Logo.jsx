@@ -1,14 +1,39 @@
-import { Cuboid } from "lucide-react";
+/**
+ * Foldify wordmark: FOLDIFY in capitals, the O is a box in the three brand teals,
+ * centred on the capitals (logo idea 3A-L, design/logo-proposals/round6).
+ */
+const CAP = 0.7; // cap height of Bai Jamjuree Bold, in em
+const BOX = 0.6; // box height, in em
 
-/** Current logo (the original cube mark), in the brand teals. */
-export default function Logo({ size = "md" }) {
-  const box = size === "sm" ? "w-8 h-8 rounded-[10px]" : "w-10 h-10 rounded-xl";
+export function LogoCube({ className = "", style }) {
   return (
-    <span className="flex items-center gap-2.5 select-none">
-      <span className={`${box} grid place-items-center text-[#06302f] shadow-[0_6px_14px_-6px_rgb(0_200_181/0.8)]`} style={{ background: "linear-gradient(135deg, #00d5c9, #00c8b5 45%, #28a1ab)" }}>
-        <Cuboid size={size === "sm" ? 17 : 21} strokeWidth={2.2} />
-      </span>
-      <span className={`font-display font-bold tracking-tight ${size === "sm" ? "text-base" : "text-xl"}`}>Foldify</span>
+    <svg viewBox="0 0 86.6 100" className={className} style={style} aria-hidden="true">
+      <polygon points="0,25 43.3,0 86.6,25 43.3,50" fill="#00d5c9" />
+      <polygon points="0,25 43.3,50 43.3,100 0,75" fill="#00c8b5" />
+      <polygon points="43.3,50 86.6,25 86.6,75 43.3,100" fill="#28a1ab" />
+    </svg>
+  );
+}
+
+export default function Logo({ size = "md" }) {
+  return (
+    <span
+      role="img"
+      aria-label="Foldify"
+      className={`font-display font-bold select-none whitespace-nowrap leading-none ${size === "sm" ? "text-[17px]" : "text-[22px]"}`}
+      style={{ letterSpacing: "0.05em" }}
+    >
+      <span aria-hidden="true">F</span>
+      <LogoCube
+        style={{
+          display: "inline-block",
+          height: `${BOX}em`,
+          width: `${BOX * 0.866}em`,
+          margin: "0 0.06em 0 0.02em",
+          verticalAlign: `${CAP / 2 - BOX / 2}em`,
+        }}
+      />
+      <span aria-hidden="true">LDIFY</span>
     </span>
   );
 }
