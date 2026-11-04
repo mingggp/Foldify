@@ -17,12 +17,19 @@ test.describe('PC / iPad landscape', () => {
     await page.goto('/')
     await ready(page)
     const play = page.getByTestId('fold-play')
+    // note every in-between value: on a slow CI machine a polled check can miss the short
+    // "part way" window, so record them all and check afterwards
+    await page.evaluate(() => {
+      window.__seen = []
+      window.__sampler = setInterval(() => window.__seen.push(window.__foldify.state.foldProgress), 10)
+    })
     await play.click()
-    // part way through, it is moving
-    await page.waitForFunction(() => window.__foldify.state.foldProgress > 0.05 && window.__foldify.state.foldProgress < 0.95, null, { timeout: 3000 })
-    await page.waitForFunction(() => window.__foldify.state.foldProgress === 1, null, { timeout: 5000 })
+    await page.waitForFunction(() => window.__foldify.state.foldProgress === 1, null, { timeout: 15_000 })
+    const seen = await page.evaluate(() => { clearInterval(window.__sampler); return window.__seen })
+    // it moved through the middle, not a jump from flat to folded
+    expect(seen.some((v) => v > 0.05 && v < 0.95)).toBe(true)
     await play.click()
-    await page.waitForFunction(() => window.__foldify.state.foldProgress === 0, null, { timeout: 5000 })
+    await page.waitForFunction(() => window.__foldify.state.foldProgress === 0, null, { timeout: 15_000 })
   })
 
   test('pick a face, give it a colour', async ({ page }) => {
